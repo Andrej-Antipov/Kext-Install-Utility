@@ -6,3 +6,4 @@ Tool to easy install or remove additional kexts into /Library/Extensions folder 
 3) Keeps info about installed kexts 
 4) Easy remove installed kexts
 5) Log kernel cache update in the desktop file
+6) English and russian interface
