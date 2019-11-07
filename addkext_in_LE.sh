@@ -280,6 +280,8 @@ DELETE_KEXT(){
     printf '\033['${n}';20f''\e[1;31m     Deleted:    \e[1;33m'"${kext_name}"'\e[0m '
     fi
 
+    DEL_KEXT_IN_PLIST
+
 }
 
 CHECK_INSTALL_KEXTS(){
@@ -375,6 +377,59 @@ printf '\r\033[6A'
 printf "%"100"s"'\n'"%"100"s"'\n'"%"100"s"'\n'"%"100"s"'\n'"%"100"s"'\n'"%"100"s"'\n'"%"100"s"
 }
 
+GET_ARGS(){
+get_args="$(cat  ~/.patches.txt | tr '\n' ';' | xargs )"
+all_path=(); var=0; m=1; while [[ $var = 0 ]]; do str="$(echo $get_args | cut -f"${m}" -d ';')"; if [[ ! $str = "" ]]; then all_path+=( "${str}" ); let "m++"; else break; fi; done
+path_count=${#all_path[@]}
+}
+
+PARSE_FOLDER(){
+if [[ -d "${new_path}" ]]; then
+get_args="$( find "${new_path}" -maxdepth 1 -type d -not -path "${new_path}" | tr '\n' ';' | xargs )"
+folder_trailed=(); var=0; m=1; while [[ $var = 0 ]]; do str="$(echo $get_args | cut -f"${m}" -d ';')"; if [[ ! $str = "" ]]; then folder_trailed+=( "${str}" ); let "m++"; else break; fi; done
+folder_trailed_count=${#folder_trailed[@]}
+    if [[ ! $folder_trailed_count = 0 ]]; then 
+        for ((i=0;i<$folder_trailed_count;i++)) do 
+        all_path_trailed+=( "$(echo "${folder_trailed[i]}" | xargs)" )
+        done
+    fi
+fi
+}
+
+TRAIL_FOLDER(){
+all_path_trailed=()
+for ((l=0;l<$path_count;l++)) do 
+new_path="$(echo "${all_path[l]}" | xargs)"; new_kext=$(echo "${new_path}" | sed 's|.*/||')
+    if [[ -f "${new_path}" ]]; then all_path_trailed+=( "$(echo "${all_path[l]}" | xargs)" )
+    else
+dota=$(echo "${new_kext}" | grep -o "\." | wc -w | tr -d ' ')
+if [[ ! "${dota}" = "0" ]] && [[ "${new_kext:0:1}" = "." ]]; then let "dota--"; fi
+if [[ ! "${dota}" = "0" ]]; then  extension="${new_kext##*.}"
+    if [[ ! ${extension} = "" ]]; then all_path_trailed+=( "$(echo "${all_path[l]}" | xargs)" ); else PARSE_FOLDER; fi
+    else
+    if [[ -f "${new_path}" ]]; then all_path_trailed+=( "$(echo "${all_path[l]}" | xargs)" ); else PARSE_FOLDER; fi
+fi
+    fi
+done
+
+all_path=( "${all_path_trailed[@]}" ); path_count=${#all_path[@]}
+}
+
+INSTALL_KEXTS(){
+n=0; corr=0
+for ((i=0;i<$path_count;i++)) do 
+new_path="$(echo "${all_path[i]}" | xargs)"
+new_kext=$(echo "${new_path}" | sed 's|.*/||'); p=${#new_kext}; let "corr=(36-p)/2+21"
+GET_KEXT_INFO
+CHECK_INSTALL_KEXTS
+done
+}
+
+GET_INSTALLED_STRING(){
+UPDATE_CACHE
+    if [[ ${cache} = 1 ]]; then strng=`echo "$KextLEconf" | grep -A 1 "<key>Installed</key>" | grep string | sed -e 's/.*>\(.*\)<.*/\1/' | tr -d '\n'`; fi
+}
+
 ###################### main #########################################################
 
 clear
@@ -427,8 +482,7 @@ if [[ ! -f ~/.patches.txt ]]; then
 
     var1=0; while [[ $var1 = 0 ]]; do
 
-     UPDATE_CACHE
-    if [[ ${cache} = 1 ]]; then strng=`echo "$KextLEconf" | grep -A 1 "<key>Installed</key>" | grep string | sed -e 's/.*>\(.*\)<.*/\1/' | tr -d '\n'`; fi
+    GET_INSTALLED_STRING
     if [[ ! $strng = "" ]]; then 
 
              GET_APP_ICON
@@ -449,17 +503,42 @@ if [[ ! -f ~/.patches.txt ]]; then
     if [[ $loc = "ru" ]]; then check_answer="Установка"; else check_answer="Install"; fi
  if [[ "$(echo $answer | cut -f2 -d':')" = "${check_answer}" ]]; then
     n=4
-    if [[ $loc = "ru" ]]; then
+            if [[ $loc = "ru" ]]; then
         printf '\033['${n}';0f''\e[1;33m     Выберите кексты для установки !    \e[0m '
-    else
+            else
         printf '\033['${n}';0f''\e[1;33m     Select the kexts to install  !    \e[0m '
-    fi
+            fi
     open -W AskKexts.app
     clear && printf '\e[3J' && printf "\033[H"
-    if [[ -f ~/.patches.txt ]]; then var1=1; else UPDATE_CACHE; strng=`echo "$KextLEconf" | grep -A 1 "<key>Installed</key>" | grep string | sed -e 's/.*>\(.*\)<.*/\1/' | tr -d '\n'`; if [[ $strng = "" ]]; then break; fi; fi
+    if [[ ! -f ~/.patches.txt ]]; then  UPDATE_CACHE; strng=`echo "$KextLEconf" | grep -A 1 "<key>Installed</key>" | grep string | sed -e 's/.*>\(.*\)<.*/\1/' | tr -d '\n'`; if [[ $strng = "" ]]; then wait_on_exit=0; break; fi
+        else
+        no_kexts=0
+        GET_ARGS
+        rm -f ~/.patches.txt
+        if [[ ${path_count} = 0 ]]; then no_kexts=1; else TRAIL_FOLDER; fi
+                if [[ ${path_count} = 0 ]]; then 
+                    no_kexts=1
+                 else 
+                    if ! GET_PASSWORD; then EXIT_PROGRAM; fi
+                    if [[ $path_count -gt 5 ]]; then let lines="path_count*2+12"; clear && printf '\e[8;'$lines';100t' && printf '\e[3J' && printf "\033[H"; fi 
+                    update_cache=0
+                    INSTALL_KEXTS
+                    if [[ $update_cache = 0 ]]; then no_kexts=1; else UPDATE_KERNEL_CACHE; fi
+                 fi                                  
+        if [[ ${no_kexts} = 1 ]]; then 
+                    if [[ $loc = "ru" ]]; then
+            printf '\033['${n}';0f''\e[1;33m     Не получены подходящие файлы для установки !    \e[0m '
+                    else
+            printf '\033['${n}';0f''\e[1;33m     No valid files to install found  !              \e[0m '
+                    fi
+            read -n 1 -s -t 3
+        fi             
+    fi
+    
  else
-       if [[ ! $strng = "" ]]; then  IFS=';'; kmlist=( ${strng} ); unset IFS; kmcount=${#kmlist[@]}; file_list=""
-       #for ((i=0;i<$kmcount;i++)) do old_kext=$(echo "${kmlist[i]}" | sed 's|.*/||'); file_list+='"'${old_kext}'"' ; if [[ ! $i = $(( $kmcount-1 )) ]]; then file_list+=","; fi ; done
+
+    if [[ ! $strng = "" ]]; then  IFS=';'; kmlist=( ${strng} ); unset IFS; kmcount=${#kmlist[@]}; file_list=""
+
        for ((i=0;i<$kmcount;i++)) do old_kext="${kmlist[i]}"; file_list+='"'${old_kext}'"' ; if [[ ! $i = $(( $kmcount-1 )) ]]; then file_list+=","; fi ; done
     
        if result=$(ASK_KEXTS_TO_DELETE); then 
@@ -471,74 +550,40 @@ if [[ ! -f ~/.patches.txt ]]; then
            n=0; corr=0 
            for ((i=0;i<$kmcount;i++)) do
            old_kext="${kmlist[i]}"
-           for ((l=0;l<$tmcount;l++)) do if [[ "${old_kext}" = $(echo "${tmlist[l]}" | xargs) ]]; then  kext_name=$(echo "${kmlist[i]}" | xargs);  DELETE_KEXT; DEL_KEXT_IN_PLIST; break; fi ; done
+           for ((l=0;l<$tmcount;l++)) do if [[ "${old_kext}" = $(echo "${tmlist[l]}" | xargs) ]]; then  kext_name=$(echo "${kmlist[i]}" | xargs);  DELETE_KEXT; break; fi ; done
            done
            UPDATE_KERNEL_CACHE
-           var1=1
            fi
         fi
     fi
  fi
-done
+    clear && printf '\e[3J' && printf "\033[H"
+    done
 fi
 
+############################# get args from file ###########################################
 
 if [[ ! -f ~/.patches.txt ]]; then EXIT_PROGRAM; fi
-get_args="$(cat  ~/.patches.txt | tr '\n' ';' | xargs )"
-all_path=(); var=0; m=1; while [[ $var = 0 ]]; do str="$(echo $get_args | cut -f"${m}" -d ';')"; if [[ ! $str = "" ]]; then all_path+=( "${str}" ); let "m++";  else break; fi; done
-path_count=${#all_path[@]}
+
+GET_ARGS
+
 rm -f ~/.patches.txt
-###########################################################################################
 
 if [[ ${path_count} = 0 ]]; then EXIT_PROGRAM; fi
 
-PARSE_FOLDER(){
-if [[ -d "${new_path}" ]]; then
-get_args="$( find "${new_path}" -maxdepth 1 -type d -not -path "${new_path}" | tr '\n' ';' | xargs )" 
-folder_trailed=(); var=0; m=1; while [[ $var = 0 ]]; do str="$(echo $get_args | cut -f"${m}" -d ';')"; if [[ ! $str = "" ]]; then folder_trailed+=( "${str}" ); let "m++";  else break; fi; done
-folder_trailed_count=${#folder_trailed[@]}
-    if [[ ! $folder_trailed_count = 0 ]]; then 
-        for ((i=0;i<$folder_trailed_count;i++)) do 
-        all_path_trailed+=( "$(echo "${folder_trailed[i]}" | xargs)" )
-        done
-    fi
-fi
-}
-
 #################### get kexts from folders ################################################
-all_path_trailed=()
-for ((l=0;l<$path_count;l++)) do 
-new_path="$(echo "${all_path[l]}" | xargs)"; new_kext=$(echo "${new_path}" | sed 's|.*/||')
-dota=$(echo "${new_kext}" | grep -o "\." | wc -w | tr -d ' ')
-if [[ ! "${dota}" = "0" ]] && [[ "${new_kext:0:1}" = "." ]]; then let "dota--"; fi
-if [[ ! "${dota}" = "0" ]]; then  extension="${new_kext##*.}"
-    if [[ ! ${extension} = "" ]]; then all_path_trailed+=( "$(echo "${all_path[l]}" | xargs)" ); else PARSE_FOLDER; fi
-    else
-    PARSE_FOLDER
-fi
-done
 
-all_path=( "${all_path_trailed[@]}" ); path_count=${#all_path[@]}
+TRAIL_FOLDER
+
 ############################################################################################
 
 if ! GET_PASSWORD; then EXIT_PROGRAM; fi
 
 if [[ $path_count -gt 5 ]]; then let lines="path_count*2+12"; clear && printf '\e[8;'$lines';100t' && printf '\e[3J' && printf "\033[H"; fi
 
-n=0; corr=0
-
-for ((i=0;i<$path_count;i++)) do 
-
-new_path="$(echo "${all_path[i]}" | xargs)"
-new_kext=$(echo "${new_path}" | sed 's|.*/||'); p=${#new_kext}; let "corr=(36-p)/2+21"
-
-GET_KEXT_INFO
-
 update_cache=0
 
-CHECK_INSTALL_KEXTS
-
-done
+INSTALL_KEXTS
 
 if [[ $update_cache = 0 ]]; then EXIT_PROGRAM; fi
 
