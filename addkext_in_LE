@@ -425,8 +425,9 @@ UPDATE_CACHE
 ################ get args string ##########################################################
 if [[ ! -f ~/.patches.txt ]]; then 
 
-    
-    UPDATE_CACHE
+    var1=0; while [[ $var1 = 0 ]]; do
+
+     UPDATE_CACHE
     if [[ ${cache} = 1 ]]; then strng=`echo "$KextLEconf" | grep -A 1 "<key>Installed</key>" | grep string | sed -e 's/.*>\(.*\)<.*/\1/' | tr -d '\n'`; fi
     if [[ ! $strng = "" ]]; then 
 
@@ -434,11 +435,11 @@ if [[ ! -f ~/.patches.txt ]]; then
 
 
                                 if [[ $loc = "ru" ]]; then
-             if answer=$(osascript -e 'display dialog "Что собираемся предпринять?" '"${icon_string}"' buttons {"Удаление", "Установка", "Отмена" } default button "Установка" '); then cancel=0; else cancel=1; fi 2>/dev/null
-             if [[ "$(echo $answer | cut -f2 -d':')" = "Отмена" ]]; then EXIT_PROGRAM; fi
+             if answer=$(osascript -e 'display dialog "Что собираемся предпринять?" '"${icon_string}"' buttons {"Удаление", "Установка", "Выход" } default button "Установка" '); then cancel=0; else cancel=1; fi 2>/dev/null
+             if [[ "$(echo $answer | cut -f2 -d':')" = "Выход" ]]; then EXIT_PROGRAM; fi
                                 else
-             if answer=$(osascript -e 'display dialog "What are you going to do?" '"${icon_string}"' buttons {"Delete", "Install", "Cancel" } default button "Install" '); then cancel=0; else cancel=1; fi 2>/dev/null
-             if [[ "$(echo $answer | cut -f2 -d':')" = "Cancel" ]]; then EXIT_PROGRAM; fi
+             if answer=$(osascript -e 'display dialog "What are you going to do?" '"${icon_string}"' buttons {"Delete", "Install", "Exit" } default button "Install" '); then cancel=0; else cancel=1; fi 2>/dev/null
+             if [[ "$(echo $answer | cut -f2 -d':')" = "Exit" ]]; then EXIT_PROGRAM; fi
                                 fi
              if [[ $cancel = 1 ]]; then EXIT_PROGRAM; fi
              
@@ -455,6 +456,7 @@ if [[ ! -f ~/.patches.txt ]]; then
     fi
     open -W AskKexts.app
     clear && printf '\e[3J' && printf "\033[H"
+    if [[ -f ~/.patches.txt ]]; then var1=1; fi
  else
        if [[ ! $strng = "" ]]; then  IFS=';'; kmlist=( ${strng} ); unset IFS; kmcount=${#kmlist[@]}; file_list=""
        #for ((i=0;i<$kmcount;i++)) do old_kext=$(echo "${kmlist[i]}" | sed 's|.*/||'); file_list+='"'${old_kext}'"' ; if [[ ! $i = $(( $kmcount-1 )) ]]; then file_list+=","; fi ; done
@@ -472,10 +474,12 @@ if [[ ! -f ~/.patches.txt ]]; then
            for ((l=0;l<$tmcount;l++)) do if [[ "${old_kext}" = $(echo "${tmlist[l]}" | xargs) ]]; then  kext_name=$(echo "${kmlist[i]}" | xargs);  DELETE_KEXT; DEL_KEXT_IN_PLIST; break; fi ; done
            done
            UPDATE_KERNEL_CACHE
+           var1=1
            fi
         fi
     fi
  fi
+done
 fi
 
 
