@@ -346,7 +346,7 @@ if [[ ${input} = [yY] ]]; then
 wait_on_exit=1
 printf '\e[1;36m     updating kernel cache ....\e[0m'
 rm -f ~/Desktop/KernelCacheUpdate.log.txt
-while :;do printf '\e[1;36m.\e[0m' ;sleep 1.5;done &
+while :;do printf '\e[1;36m.\e[0m' ;sleep 2;done &
 trap "kill $!" EXIT 
 sudo kextcache -i / &> ~/Desktop/KernelCacheUpdate.log.txt >/dev/null
 kill $!
