@@ -482,6 +482,7 @@ if [[ ! -f ~/.patches.txt ]]; then
 
     var1=0; while [[ $var1 = 0 ]]; do
 
+
     GET_INSTALLED_STRING
     if [[ ! $strng = "" ]]; then 
 
@@ -557,7 +558,7 @@ if [[ ! -f ~/.patches.txt ]]; then
         fi
     fi
  fi
-    clear && printf '\e[3J' && printf "\033[H"
+    clear && printf '\e[8;22;100t' && printf '\e[3J' && printf "\033[H"
     done
 fi
 
