@@ -306,12 +306,12 @@ if [[ ${extension} = "kext" ]] || [[ ${extension} = "bundle" ]] || [[ ${extensio
     ADD_KEXT_IN_PLIST
 
     else
+    wait_on_exit=1
     if [[ $loc = "ru" ]]; then
     printf '\033['${n}';0f''\e[1;31m  НЕ установлен:    \e[1;33m''\033['${n}';'$corr'f'${new_kext}'\033['${n}';54f''\e[0m'
     else
     printf '\033['${n}';0f''\e[1;31m  NOT Installed:    \e[1;33m''\033['${n}';'$corr'f'${new_kext}'\033['${n}';54f''\e[0m'
     fi
-    if [[ $n = 0 ]]; then sleep 2; fi
 
 
 fi
@@ -456,7 +456,7 @@ if [[ ! -f ~/.patches.txt ]]; then
     fi
     open -W AskKexts.app
     clear && printf '\e[3J' && printf "\033[H"
-    if [[ -f ~/.patches.txt ]]; then var1=1; fi
+    if [[ -f ~/.patches.txt ]]; then var1=1; else UPDATE_CACHE; strng=`echo "$KextLEconf" | grep -A 1 "<key>Installed</key>" | grep string | sed -e 's/.*>\(.*\)<.*/\1/' | tr -d '\n'`; if [[ $strng = "" ]]; then break; fi; fi
  else
        if [[ ! $strng = "" ]]; then  IFS=';'; kmlist=( ${strng} ); unset IFS; kmcount=${#kmlist[@]}; file_list=""
        #for ((i=0;i<$kmcount;i++)) do old_kext=$(echo "${kmlist[i]}" | sed 's|.*/||'); file_list+='"'${old_kext}'"' ; if [[ ! $i = $(( $kmcount-1 )) ]]; then file_list+=","; fi ; done
@@ -537,7 +537,6 @@ GET_KEXT_INFO
 update_cache=0
 
 CHECK_INSTALL_KEXTS
-
 
 done
 
