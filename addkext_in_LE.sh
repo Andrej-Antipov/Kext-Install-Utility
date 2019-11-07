@@ -19,13 +19,13 @@ echo " " >> ~/temp.txt
 echo "new_path = ""${new_path}" >> ~/temp.txt
 echo " " >> ~/temp.txt
 echo "kext_path = ""${kext_path}" >> ~/temp.txt
-echo "n = ""${n}" >> ~/temp.txt
+echo "result = ""${result}" >> ~/temp.txt
 echo " " >> ~/temp.txt
 echo "old_kext = ""${old_kext}" >> ~/temp.txt
 echo "tmlist/l/ = ""${tmlist[l]}" >> ~/temp.txt
 echo " " >> ~/temp.txt
 echo "m = ""${m}" >> ~/temp.txt
-echo "l = ""${l}" >> ~/temp.txt
+#echo "l = ""${l}" >> ~/temp.txt
 echo "tmlist = ""${tmlist[@]}" >> ~/temp.txt
 echo "tmcount= ""${tmcount}" >> ~/temp.txt
 echo "strng = ""$strng" >> ~/temp.txt
@@ -39,11 +39,9 @@ fi
 #########################################################################################################################################
 
 UPDATE_CACHE(){
-if [[ -f ~/Library/Application\ Support/KextLEinstaller/InstalledKext.plist ]]; then
-KextLEconf=$( cat ~/Library/Application\ Support/KextLEinstaller/InstalledKext.plist )
-cache=1
+if [[ -f ~/Library/Application\ Support/KextLEinstaller/InstalledKext.plist ]]; then KextLEconf=$( cat ~/Library/Application\ Support/KextLEinstaller/InstalledKext.plist ); cache=1
 else
-unset KextLEconf; cache=0
+    unset KextLEconf; cache=0
 fi
 }
 
@@ -51,13 +49,15 @@ ASK_KEXTS_TO_DELETE(){
 if [[ $loc = "ru" ]]; then
 osascript <<EOD
 tell application "System Events"    activate
-set ThemeList to {$file_list}set FavoriteThemeAnswer to choose from list ThemeList with title "Удалить установленные файлы" with prompt "Выберите один или несколько файлов" default items "Basic" with multiple selections allowed#set FavoriteThemeAnswer to FavoriteThemeAnswer's item 1 (* extract choice from list *)
+set ThemeList to {$file_list}
+set FavoriteThemeAnswer to choose from list ThemeList with title "Удалить установленные файлы" with prompt "Выберите один или несколько файлов" default items "Basic" with multiple selections allowed#set FavoriteThemeAnswer to FavoriteThemeAnswer's item 1 (* extract choice from list *)
 end tell
 EOD
 else
 osascript <<EOD
 tell application "System Events"    activate
-set ThemeList to {$file_list}set FavoriteThemeAnswer to choose from list ThemeList with title "Delete installed files" with prompt "Select one or more files" default items "Basic" with multiple selections allowed#set FavoriteThemeAnswer to FavoriteThemeAnswer's item 1 (* extract choice from list *)
+set ThemeList to {$file_list}
+set FavoriteThemeAnswer to choose from list ThemeList with title "Delete installed files" with prompt "Select one or more files" default items "Basic" with multiple selections allowed#set FavoriteThemeAnswer to FavoriteThemeAnswer's item 1 (* extract choice from list *)
 end tell
 EOD
 fi
@@ -252,10 +252,11 @@ fi
 #####################################################################################################################
 if [[ $textedit_flag = 1 ]]; then
   textedit_now=$(ps -xao tty,pid,command | grep -v grep | grep "TextEdit" | wc -l | tr -d ' ')
-  let "textedit_count=textedit_now-1"
-  if [[ $textedit_count = 0 ]]; then osascript -e 'tell app "TextEdit" to close first  window' && osascript -e 'quit app "TextEdit.app"' >/dev/null 2>/dev/null
+  if [[ $textedit_now -gt 0 ]]; then let "textedit_count=textedit_now-1"
+    if [[ $textedit_count = 0 ]]; then osascript -e 'tell app "TextEdit" to close first  window' && osascript -e 'quit app "TextEdit.app"' >/dev/null 2>/dev/null
         else
             osascript -e 'tell app "TextEdit" to close first  window' >/dev/null 2>/dev/null
+    fi
   fi
 fi
 
@@ -290,18 +291,18 @@ let "n++"; let "n++"
 if [[ ${extension} = "kext" ]] || [[ ${extension} = "bundle" ]] || [[ ${extension} = "plugin" ]]; then 
     update_cache=1
     if [[ $loc = "ru" ]]; then
-    printf '\033['${n}';0f''     Установлен:    \e[1;33m''\033['${n}';'$corr'f'${new_kext}'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m'
+    printf '\033['${n}';0f''     Установлен:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m'
     else
-    printf '\033['${n}';0f''      Installed:    \e[1;33m''\033['${n}';'$corr'f'${new_kext}'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m'
+    printf '\033['${n}';0f''      Installed:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m'
     fi
     if [[ ! $old_ver = "" ]]; then  printf ' -   was ver. \e[1;31m'$old_ver'\e[0m \n' else printf '\n'; fi
     
     echo $mypassword | sudo -S printf '' >/dev/null 2>/dev/null
 
-    if [[ -d /Library/Extensions/${new_kext} ]]; then sudo rm -Rf /Library/Extensions/${new_kext}; fi
+    if [[ -d /Library/Extensions/"${new_kext}" ]]; then sudo rm -Rf /Library/Extensions/"${new_kext}"; fi
     sudo cp -a "${new_path}" /Library/Extensions
-    sudo chown -R root:wheel /Library/Extensions/${new_kext}
-    sudo chmod  -R 755 /Library/Extensions/${new_kext}
+    sudo chown -R root:wheel /Library/Extensions/"${new_kext}"
+    sudo chmod  -R 755 /Library/Extensions/"${new_kext}"
     ADD_KEXT_IN_PLIST
 
     else
@@ -341,7 +342,7 @@ GET_KEXT_INFO(){
 sver="${new_path}"
 sver="$(plutil -p "${sver}"/Contents/Info.plist | grep CFBundleShortVersionString | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
 old_ver=""
-old_ver="$(plutil -p /Library/Extensions/${new_kext}/Contents/Info.plist | grep CFBundleShortVersionString  | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
+old_ver="$(plutil -p /Library/Extensions/"${new_kext}"/Contents/Info.plist | grep CFBundleShortVersionString  | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
 }
 
 UPDATE_KERNEL_CACHE(){
@@ -458,7 +459,6 @@ if [[ ! -f ~/.patches.txt ]]; then
        if [[ ! $strng = "" ]]; then  IFS=';'; kmlist=( ${strng} ); unset IFS; kmcount=${#kmlist[@]}; file_list=""
        #for ((i=0;i<$kmcount;i++)) do old_kext=$(echo "${kmlist[i]}" | sed 's|.*/||'); file_list+='"'${old_kext}'"' ; if [[ ! $i = $(( $kmcount-1 )) ]]; then file_list+=","; fi ; done
        for ((i=0;i<$kmcount;i++)) do old_kext="${kmlist[i]}"; file_list+='"'${old_kext}'"' ; if [[ ! $i = $(( $kmcount-1 )) ]]; then file_list+=","; fi ; done
-       
     
        if result=$(ASK_KEXTS_TO_DELETE); then 
            if [[ ! $result = "false" ]]; then 
@@ -469,7 +469,7 @@ if [[ ! -f ~/.patches.txt ]]; then
            n=0; corr=0 
            for ((i=0;i<$kmcount;i++)) do
            old_kext="${kmlist[i]}"
-           for ((l=0;l<$tmcount;l++)) do if [[ "${old_kext}" = $(echo "${tmlist[l]}" | tr -d ' ') ]]; then  kext_name=$(echo "${kmlist[i]}" | xargs); DELETE_KEXT; DEL_KEXT_IN_PLIST; break; fi ; done
+           for ((l=0;l<$tmcount;l++)) do if [[ "${old_kext}" = $(echo "${tmlist[l]}" | xargs) ]]; then  kext_name=$(echo "${kmlist[i]}" | xargs);  DELETE_KEXT; DEL_KEXT_IN_PLIST; break; fi ; done
            done
            UPDATE_KERNEL_CACHE
            fi
