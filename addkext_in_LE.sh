@@ -57,7 +57,7 @@ EOD
 else
 osascript <<EOD
 tell application "System Events"    activate
-set ThemeList to {$file_list}set FavoriteThemeAnswer to choose from list ThemeList with title "Choose theme" with prompt "What system theme set to edit?" default items "Basic" with multiple selections allowed#set FavoriteThemeAnswer to FavoriteThemeAnswer's item 1 (* extract choice from list *)
+set ThemeList to {$file_list}set FavoriteThemeAnswer to choose from list ThemeList with title "Delete installed files" with prompt "Select one or more files" default items "Basic" with multiple selections allowed#set FavoriteThemeAnswer to FavoriteThemeAnswer's item 1 (* extract choice from list *)
 end tell
 EOD
 fi
@@ -250,6 +250,15 @@ if [[ $loc = "ru" ]]; then
 read -n1 -s 
 fi
 #####################################################################################################################
+if [[ $textedit_flag = 1 ]]; then
+  textedit_now=$(ps -xao tty,pid,command | grep -v grep | grep "TextEdit" | wc -l | tr -d ' ')
+  let "textedit_count=textedit_now-1"
+  if [[ $textedit_count = 0 ]]; then osascript -e 'tell app "TextEdit" to close first  window' && osascript -e 'quit app "TextEdit.app"' >/dev/null 2>/dev/null
+        else
+            osascript -e 'tell app "TextEdit" to close first  window' >/dev/null 2>/dev/null
+  fi
+fi
+
 CHECK_TTY_COUNT	
 if [[ ${TTYcount} = 0  ]]; then   osascript -e 'tell application "Terminal" to close first window' && osascript -e 'quit app "terminal.app"' & exit
 	else
@@ -354,7 +363,8 @@ wait $! 2>/dev/null
 trap " " EXIT
 echo
 echo
-if [[ -f ~/Desktop/KernelCacheUpdate.log.txt ]]; then open -n ~/Desktop/KernelCacheUpdate.log.txt; osascript -e 'tell application "Terminal" to activate'; fi
+text_edit_flag=0
+if [[ -f ~/Desktop/KernelCacheUpdate.log.txt ]]; then textedit_flag=1; open -a "TextEdit" -n  ~/Desktop/KernelCacheUpdate.log.txt; osascript -e 'tell application "Terminal" to activate'; fi
 printf '\r\n\e[1;36m     timeout after: \e[1;32m'  
 TIMEOUT
 printf '\e[0m\r''                                                                       \n\n'
@@ -424,21 +434,23 @@ if [[ ! -f ~/.patches.txt ]]; then
 
                                 if [[ $loc = "ru" ]]; then
              if answer=$(osascript -e 'display dialog "Что собираемся предпринять?" '"${icon_string}"' buttons {"Удаление", "Установка", "Отмена" } default button "Установка" '); then cancel=0; else cancel=1; fi 2>/dev/null
+             if [[ "$(echo $answer | cut -f2 -d':')" = "Отмена" ]]; then EXIT_PROGRAM; fi
                                 else
-             if answer=$(osascript -e 'display dialog "Что собираемся предпринять?" '"${icon_string}"' buttons {"Удаление", "Установка", "Отмена" } default button "Установка" '); then cancel=0; else cancel=1; fi 2>/dev/null
+             if answer=$(osascript -e 'display dialog "What are you going to do?" '"${icon_string}"' buttons {"Delete", "Install", "Cancel" } default button "Install" '); then cancel=0; else cancel=1; fi 2>/dev/null
+             if [[ "$(echo $answer | cut -f2 -d':')" = "Cancel" ]]; then EXIT_PROGRAM; fi
                                 fi
              if [[ $cancel = 1 ]]; then EXIT_PROGRAM; fi
-             if [[ "$(echo $answer | cut -f2 -d':')" = "Отмена" ]]; then EXIT_PROGRAM; fi
+             
     else
-            answer="Установка"
+            if [[ $loc = "ru" ]]; then answer="Установка"; else answer="Install"; fi
     fi
-
- if [[ "$(echo $answer | cut -f2 -d':')" = "Установка" ]]; then
+    if [[ $loc = "ru" ]]; then check_answer="Установка"; else check_answer="Install"; fi
+ if [[ "$(echo $answer | cut -f2 -d':')" = "${check_answer}" ]]; then
     n=4
     if [[ $loc = "ru" ]]; then
         printf '\033['${n}';0f''\e[1;33m     Выберите кексты для установки !    \e[0m '
     else
-        printf '\033['${n}';0f''\e[1;33m     Select the keksts to install  !    \e[0m '
+        printf '\033['${n}';0f''\e[1;33m     Select the kexts to install  !    \e[0m '
     fi
     open -W AskKexts.app
     clear && printf '\e[3J' && printf "\033[H"
