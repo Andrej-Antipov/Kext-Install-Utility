@@ -273,7 +273,7 @@ fi
 DELETE_KEXT(){
 
     let "n++"; let "n++"
-    if [[ -d /Library/Extensions/"${kext_name}" ]] && [[ ! /Library/Extensions/"${kext_name}" = "/Library/Extensions/" ]]; then sudo rm -Rf /Library/Extensions/"${kext_name}"; update_cache=1; fi
+    if [[ -d /Library/Extensions/"${kext_name}" ]] && [[ ! /Library/Extensions/"${kext_name}" = "/Library/Extensions/" ]]; then new_kext="${kext_name}"; BACKUP_EXTENSION; sudo rm -Rf /Library/Extensions/"${kext_name}"; update_cache=1; fi
     if [[ $loc = "ru" ]]; then
     printf '\033['${n}';20f''\e[1;31m     Удалён:    \e[1;33m'"${kext_name}"'\e[0m '
     else
@@ -301,6 +301,8 @@ if [[ ${extension} = "kext" ]] || [[ ${extension} = "bundle" ]] || [[ ${extensio
     
     echo $mypassword | sudo -S printf '' >/dev/null 2>/dev/null
 
+    BACKUP_EXTENSION
+
     if [[ -d /Library/Extensions/"${new_kext}" ]]; then sudo rm -Rf /Library/Extensions/"${new_kext}"; fi
     sudo cp -a "${new_path}" /Library/Extensions
     sudo chown -R root:wheel /Library/Extensions/"${new_kext}"
@@ -317,8 +319,20 @@ if [[ ${extension} = "kext" ]] || [[ ${extension} = "bundle" ]] || [[ ${extensio
 
 
 fi
+}
 
+CREATE_TIMESTAMP(){
+    TIME_STAMP=$( date +"%d-%m-%y"" (%H_%M)" )
+if [[ -d ~/Desktop/"Replaced Extensions"/"Library Extensions"/"${TIME_STAMP}" ]]; then
+  for ((b=1;b<10;b++)) do if [[ -d ~/Desktop/"Replaced Extensions"/"Library Extensions"/"${TIME_STAMP}" ]]; then TIME_STAMP=${TIME_STAMP:0:16}; TIME_STAMP+="-""${b}"; else break; fi; done
+fi
+}
 
+BACKUP_EXTENSION(){
+if [[ -d /Library/Extensions/"${new_kext}" ]]; then
+if [[ ! -d ~/Desktop/"Replaced Extensions"/"Library Extensions"/"${TIME_STAMP}" ]]; then mkdir -p ~/Desktop/"Replaced Extensions"/"Library Extensions"/"${TIME_STAMP}"; fi
+if [[ ! -d ~/Desktop/"Replaced Extensions"/"Library Extensions"/"${TIME_STAMP}"/"${new_kext}" ]]; then cp -a /Library/Extensions/"${new_kext}" ~/Desktop/"Replaced Extensions"/"Library Extensions"/"${TIME_STAMP}"; fi
+fi
 }
 
 function ProgressBar {
@@ -349,9 +363,6 @@ old_ver="$(plutil -p /Library/Extensions/"${new_kext}"/Contents/Info.plist | gre
 
 UPDATE_KERNEL_CACHE(){
 osascript -e 'tell application "Terminal" to activate'
-
-SET_INPUT
-
 echo
 echo
 echo "       Update cache (y/N) ?"
@@ -419,6 +430,8 @@ all_path=( "${all_path_trailed[@]}" ); path_count=${#all_path[@]}
 }
 
 INSTALL_KEXTS(){
+osascript -e 'tell application "Terminal" to activate'
+CREATE_TIMESTAMP
 n=0; corr=0
 for ((i=0;i<$path_count;i++)) do 
 new_path="$(echo "${all_path[i]}" | xargs)"
@@ -433,60 +446,7 @@ UPDATE_CACHE
     if [[ ${cache} = 1 ]]; then strng=`echo "$KextLEconf" | grep -A 1 "<key>Installed</key>" | grep string | sed -e 's/.*>\(.*\)<.*/\1/' | tr -d '\n'`; fi
 }
 
-
-SET_INPUT(){
-
-layout_name=`defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleSelectedInputSources | egrep -w 'KeyboardLayout Name' | sed -E 's/.+ = "?([^"]+)"?;/\1/' | tr -d "\n"`
-xkbs=1
-
-case ${layout_name} in
- "Russian"          ) xkbs=2 ;;
- "RussianWin"       ) xkbs=2 ;;
- "Russian-Phonetic" ) xkbs=2 ;;
- "Ukrainian"        ) xkbs=2 ;;
- "Ukrainian-PC"     ) xkbs=2 ;;
- "Byelorussian"     ) xkbs=2 ;;
- esac
-
-if [[ $xkbs = 2 ]]; then 
-cd "$(dirname "$0")"
-    if [[ -f "./xkbswitch" ]]; then 
-declare -a layouts_names
-layouts=`defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleInputSourceHistory | egrep -w 'KeyboardLayout Name' | sed -E 's/.+ = "?([^"]+)"?;/\1/' | tr  '\n' ';'`
-IFS=";"; layouts_names=($layouts); unset IFS; num=${#layouts_names[@]}
-keyboard="0"
-
-while [ $num != 0 ]; do 
-case ${layouts_names[$num]} in
- "ABC"                ) keyboard=${layouts_names[$num]} ;;
- "US Extended"        ) keyboard="USExtended" ;;
- "USInternational-PC" ) keyboard=${layouts_names[$num]} ;;
- "U.S."               ) keyboard="US" ;;
- "British"            ) keyboard=${layouts_names[$num]} ;;
- "British-PC"         ) keyboard=${layouts_names[$num]} ;;
-esac
-
-        if [[ ! $keyboard = "0" ]]; then num=1; fi
-let "num--"
-done
-
-if [[ ! $keyboard = "0" ]]; then ./xkbswitch -se $keyboard; fi
-   else
-        if [[ $loc = "ru" ]]; then
-printf '\n\n                         ! Смените раскладку на латиницу !'
-            else
-printf '\n\n                          ! Change layout to UTF-8 ABC, US or EN !'
-        fi
-read -t 2 -n 2 -s
-printf '\r                                                                               \r'
- printf "\r\n\033[3A\033[46C" ; if [[ $order = 3 ]]; then printf "\033[3C"; fi   fi
-
-fi
-}
-
 ###################### main #########################################################
-
-SET_INPUT
 
 clear
 
@@ -604,6 +564,8 @@ if [[ ! -f ~/.patches.txt ]]; then
            echo $mypassword | sudo -S printf '' >/dev/null 2>/dev/null
            IFS=","; tmlist=( ${result} ); unset IFS; tmcount=${#tmlist[@]}
            if [[ $tmcount -gt 5 ]]; then let lines="tmcount*2+12"; clear && printf '\e[8;'$lines';100t' && printf '\e[3J' && printf "\033[H"; fi
+           osascript -e 'tell application "Terminal" to activate'
+           CREATE_TIMESTAMP
            n=0; corr=0 
            for ((i=0;i<$kmcount;i++)) do
            old_kext="${kmlist[i]}"

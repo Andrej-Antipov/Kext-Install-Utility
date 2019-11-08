@@ -273,7 +273,7 @@ fi
 DELETE_KEXT(){
 
     let "n++"; let "n++"
-    if [[ -d /System/Library/Extensions/"${kext_name}" ]] && [[ ! /System/Library/Extensions/"${kext_name}" = "/System/Library/Extensions/" ]]; then sudo rm -Rf /System/Library/Extensions/"${kext_name}"; update_cache=1; fi
+    if [[ -d /System/Library/Extensions/"${kext_name}" ]] && [[ ! /System/Library/Extensions/"${kext_name}" = "/System/Library/Extensions/" ]]; then new_kext="${kext_name}"; BACKUP_EXTENSION; sudo rm -Rf /System/Library/Extensions/"${kext_name}"; update_cache=1; fi
     if [[ $loc = "ru" ]]; then
     printf '\033['${n}';20f''\e[1;31m     Удалён:    \e[1;33m'"${kext_name}"'\e[0m '
     else
@@ -301,6 +301,8 @@ if [[ ${extension} = "kext" ]] || [[ ${extension} = "bundle" ]] || [[ ${extensio
     
     echo $mypassword | sudo -S printf '' >/dev/null 2>/dev/null
 
+    BACKUP_EXTENSION
+
     if [[ -d /System/Library/Extensions/"${new_kext}" ]]; then sudo rm -Rf /System/Library/Extensions/"${new_kext}"; fi
     sudo cp -a "${new_path}" /System/Library/Extensions
     sudo chown -R root:wheel /System/Library/Extensions/"${new_kext}"
@@ -317,8 +319,20 @@ if [[ ${extension} = "kext" ]] || [[ ${extension} = "bundle" ]] || [[ ${extensio
 
 
 fi
+}
 
+CREATE_TIMESTAMP(){
+    TIME_STAMP=$( date +"%d-%m-%y"" (%H_%M)" )
+if [[ -d ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}" ]]; then
+  for ((b=1;b<10;b++)) do if [[ -d ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}" ]]; then TIME_STAMP=${TIME_STAMP:0:16}; TIME_STAMP+="-""${b}"; else break; fi; done
+fi
+}
 
+BACKUP_EXTENSION(){
+if [[ -d /System/Library/Extensions/"${new_kext}" ]]; then
+if [[ ! -d ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}" ]]; then mkdir -p ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}"; fi
+if [[ ! -d ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}"/"${new_kext}" ]]; then cp -a /System/Library/Extensions/"${new_kext}" ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}"; fi
+fi
 }
 
 function ProgressBar {
@@ -419,6 +433,8 @@ all_path=( "${all_path_trailed[@]}" ); path_count=${#all_path[@]}
 }
 
 INSTALL_KEXTS(){
+osascript -e 'tell application "Terminal" to activate'
+CREATE_TIMESTAMP
 n=0; corr=0
 for ((i=0;i<$path_count;i++)) do 
 new_path="$(echo "${all_path[i]}" | xargs)"
@@ -603,6 +619,8 @@ if [[ ! -f ~/.spatches.txt ]]; then
            echo $mypassword | sudo -S printf '' >/dev/null 2>/dev/null
            IFS=","; tmlist=( ${result} ); unset IFS; tmcount=${#tmlist[@]}
            if [[ $tmcount -gt 5 ]]; then let lines="tmcount*2+12"; clear && printf '\e[8;'$lines';100t' && printf '\e[3J' && printf "\033[H"; fi
+           osascript -e 'tell application "Terminal" to activate'
+           CREATE_TIMESTAMP
            n=0; corr=0 
            for ((i=0;i<$kmcount;i++)) do
            old_kext="${kmlist[i]}"
