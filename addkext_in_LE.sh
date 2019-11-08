@@ -349,6 +349,9 @@ old_ver="$(plutil -p /Library/Extensions/"${new_kext}"/Contents/Info.plist | gre
 
 UPDATE_KERNEL_CACHE(){
 osascript -e 'tell application "Terminal" to activate'
+
+SET_INPUT
+
 echo
 echo
 echo "       Update cache (y/N) ?"
@@ -430,7 +433,60 @@ UPDATE_CACHE
     if [[ ${cache} = 1 ]]; then strng=`echo "$KextLEconf" | grep -A 1 "<key>Installed</key>" | grep string | sed -e 's/.*>\(.*\)<.*/\1/' | tr -d '\n'`; fi
 }
 
+
+SET_INPUT(){
+
+layout_name=`defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleSelectedInputSources | egrep -w 'KeyboardLayout Name' | sed -E 's/.+ = "?([^"]+)"?;/\1/' | tr -d "\n"`
+xkbs=1
+
+case ${layout_name} in
+ "Russian"          ) xkbs=2 ;;
+ "RussianWin"       ) xkbs=2 ;;
+ "Russian-Phonetic" ) xkbs=2 ;;
+ "Ukrainian"        ) xkbs=2 ;;
+ "Ukrainian-PC"     ) xkbs=2 ;;
+ "Byelorussian"     ) xkbs=2 ;;
+ esac
+
+if [[ $xkbs = 2 ]]; then 
+cd "$(dirname "$0")"
+    if [[ -f "./xkbswitch" ]]; then 
+declare -a layouts_names
+layouts=`defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleInputSourceHistory | egrep -w 'KeyboardLayout Name' | sed -E 's/.+ = "?([^"]+)"?;/\1/' | tr  '\n' ';'`
+IFS=";"; layouts_names=($layouts); unset IFS; num=${#layouts_names[@]}
+keyboard="0"
+
+while [ $num != 0 ]; do 
+case ${layouts_names[$num]} in
+ "ABC"                ) keyboard=${layouts_names[$num]} ;;
+ "US Extended"        ) keyboard="USExtended" ;;
+ "USInternational-PC" ) keyboard=${layouts_names[$num]} ;;
+ "U.S."               ) keyboard="US" ;;
+ "British"            ) keyboard=${layouts_names[$num]} ;;
+ "British-PC"         ) keyboard=${layouts_names[$num]} ;;
+esac
+
+        if [[ ! $keyboard = "0" ]]; then num=1; fi
+let "num--"
+done
+
+if [[ ! $keyboard = "0" ]]; then ./xkbswitch -se $keyboard; fi
+   else
+        if [[ $loc = "ru" ]]; then
+printf '\n\n                         ! Смените раскладку на латиницу !'
+            else
+printf '\n\n                          ! Change layout to UTF-8 ABC, US or EN !'
+        fi
+read -t 2 -n 2 -s
+printf '\r                                                                               \r'
+ printf "\r\n\033[3A\033[46C" ; if [[ $order = 3 ]]; then printf "\033[3C"; fi   fi
+
+fi
+}
+
 ###################### main #########################################################
+
+SET_INPUT
 
 clear
 
