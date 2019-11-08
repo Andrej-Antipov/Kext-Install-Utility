@@ -5,5 +5,6 @@ Tools to easy install or remove additional kexts into /Library/Extensions & /Sys
 2) Store password in keychain
 3) Keeps info about installed kexts 
 4) Easy remove installed kexts
-5) Log kernel cache update in the desktop file
-6) English and russian interface
+5) Auto backup replaced and removed kexts
+6) Log kernel cache update in the desktop file
+7) English and russian interface
