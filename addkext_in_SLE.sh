@@ -403,7 +403,8 @@ TRAIL_FOLDER(){
 all_path_trailed=()
 for ((l=0;l<$path_count;l++)) do 
 new_path="$(echo "${all_path[l]}" | xargs)"; new_kext=$(echo "${new_path}" | sed 's|.*/||')
-    if [[ ! -f "${new_path}" ]]; then 
+  if [[ ! -f "${new_path}" ]]; then 
+    if [[ ! "${new_path}" = "/System/Library/Extensions" ]] &&  [[ ! "$( echo "${new_path}" | sed 's/[^/]*$//' )" = "/System/Library/Extensions/" ]];  then
       if [[ -d "${new_path}" ]]; then 
         if [[ -f "${new_path}"/Contents/Info.plist ]]; then all_path_trailed+=( "$(echo "${all_path[l]}" | xargs)" )
             else
@@ -420,6 +421,7 @@ new_path="$(echo "${all_path[l]}" | xargs)"; new_kext=$(echo "${new_path}" | sed
         fi
       fi
     fi
+  fi
 done
 all_path=( "${all_path_trailed[@]}" ); path_count=${#all_path[@]}
 }
