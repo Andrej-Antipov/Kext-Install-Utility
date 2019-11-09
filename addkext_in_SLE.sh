@@ -322,7 +322,7 @@ fi
 }
 
 CREATE_TIMESTAMP(){
-    TIME_STAMP=$( date +"%d-%m-%y"" (%H_%M)" )
+    TIME_STAMP=$( date +"%d-%m-%y"" (%H.%M)" )
 if [[ -d ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}" ]]; then
   for ((b=1;b<10;b++)) do if [[ -d ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}" ]]; then TIME_STAMP=${TIME_STAMP:0:16}; TIME_STAMP+="-""${b}"; else break; fi; done
 fi
@@ -398,37 +398,31 @@ GET_ARGS(){
 get_args="$(cat  ~/.spatches.txt | tr '\n' ';' | xargs )"
 all_path=(); var=0; m=1; while [[ $var = 0 ]]; do str="$(echo $get_args | cut -f"${m}" -d ';')"; if [[ ! $str = "" ]]; then all_path+=( "${str}" ); let "m++"; else break; fi; done
 path_count=${#all_path[@]}
-}
-
-PARSE_FOLDER(){
-if [[ -d "${new_path}" ]]; then
-get_args="$( find "${new_path}" -maxdepth 1 -type d -not -path "${new_path}" | tr '\n' ';' | xargs )"
-folder_trailed=(); var=0; m=1; while [[ $var = 0 ]]; do str="$(echo $get_args | cut -f"${m}" -d ';')"; if [[ ! $str = "" ]]; then folder_trailed+=( "${str}" ); let "m++"; else break; fi; done
-folder_trailed_count=${#folder_trailed[@]}
-    if [[ ! $folder_trailed_count = 0 ]]; then 
-        for ((i=0;i<$folder_trailed_count;i++)) do 
-        all_path_trailed+=( "$(echo "${folder_trailed[i]}" | xargs)" )
-        done
-    fi
-fi
+rm -f ~/.spatches.txt
 }
 
 TRAIL_FOLDER(){
 all_path_trailed=()
 for ((l=0;l<$path_count;l++)) do 
 new_path="$(echo "${all_path[l]}" | xargs)"; new_kext=$(echo "${new_path}" | sed 's|.*/||')
-    if [[ -f "${new_path}" ]]; then all_path_trailed+=( "$(echo "${all_path[l]}" | xargs)" )
-    else
-dota=$(echo "${new_kext}" | grep -o "\." | wc -w | tr -d ' ')
-if [[ ! "${dota}" = "0" ]] && [[ "${new_kext:0:1}" = "." ]]; then let "dota--"; fi
-if [[ ! "${dota}" = "0" ]]; then  extension="${new_kext##*.}"
-    if [[ ! ${extension} = "" ]]; then all_path_trailed+=( "$(echo "${all_path[l]}" | xargs)" ); else PARSE_FOLDER; fi
-    else
-    if [[ -f "${new_path}" ]]; then all_path_trailed+=( "$(echo "${all_path[l]}" | xargs)" ); else PARSE_FOLDER; fi
-fi
+    if [[ ! -f "${new_path}" ]]; then 
+      if [[ -d "${new_path}" ]]; then 
+        if [[ -f "${new_path}"/Contents/Info.plist ]]; then all_path_trailed+=( "$(echo "${all_path[l]}" | xargs)" )
+            else
+                get_args="$( find "${new_path}" -maxdepth 1 -type d -not -path "${new_path}" | tr '\n' ';' | xargs )"
+                folder_trailed=(); var=0; m=1; while [[ $var = 0 ]]; do str="$(echo $get_args | cut -f"${m}" -d ';')"; if [[ ! $str = "" ]]; then folder_trailed+=( "${str}" ); let "m++"; else break; fi; done
+                folder_trailed_count=${#folder_trailed[@]}
+                if [[ ! $folder_trailed_count = 0 ]]; then 
+                    for ((i=0;i<$folder_trailed_count;i++)) do 
+                    if [[ ! -f "$(echo "${folder_trailed[i]}" | xargs)" ]]; then
+                        if [[ -f "$(echo "${folder_trailed[i]}" | xargs)"/Contents/Info.plist ]]; then  all_path_trailed+=( "$(echo "${folder_trailed[i]}" | xargs)" ); fi
+                    fi
+                    done
+                fi
+        fi
+      fi
     fi
 done
-
 all_path=( "${all_path_trailed[@]}" ); path_count=${#all_path[@]}
 }
 
@@ -580,13 +574,15 @@ if [[ ! -f ~/.spatches.txt ]]; then
             else
         printf '\033['${n}';0f''\e[1;33m     Select the kexts to install  !    \e[0m '
             fi
+    sleep 0.3
     open -W AskKexts.app
     clear && printf '\e[3J' && printf "\033[H"
     if [[ ! -f ~/.spatches.txt ]]; then  UPDATE_CACHE; strng=`echo "$KextLEconf" | grep -A 1 "<key>Installed</key>" | grep string | sed -e 's/.*>\(.*\)<.*/\1/' | tr -d '\n'`; if [[ $strng = "" ]]; then wait_on_exit=0; break; fi
         else
         no_kexts=0
+
         GET_ARGS
-        rm -f ~/.spatches.txt
+
         if [[ ${path_count} = 0 ]]; then no_kexts=1; else TRAIL_FOLDER; fi
                 if [[ ${path_count} = 0 ]]; then 
                     no_kexts=1
@@ -640,8 +636,6 @@ fi
 if [[ ! -f ~/.spatches.txt ]]; then EXIT_PROGRAM; fi
 
 GET_ARGS
-
-rm -f ~/.spatches.txt
 
 if [[ ${path_count} = 0 ]]; then EXIT_PROGRAM; fi
 
