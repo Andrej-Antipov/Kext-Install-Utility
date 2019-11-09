@@ -268,8 +268,6 @@ fi
 
 }
 
-
-
 DELETE_KEXT(){
 
     let "n++"; let "n++"
@@ -303,7 +301,7 @@ if [[ ${extension} = "kext" ]] || [[ ${extension} = "bundle" ]] || [[ ${extensio
 
     BACKUP_EXTENSION
 
-    if [[ -d /System/Library/Extensions/"${new_kext}" ]]; then sudo rm -Rf /System/Library/Extensions/"${new_kext}"; fi
+    if [[ -d /System/Library/Extensions/"${new_kext}" ]] && [[ ! /System/Library/Extensions/"${new_kext}" = "/System/Library/Extensions/" ]]; then sudo rm -Rf /System/Library/Extensions/"${new_kext}"; fi
     sudo cp -a "${new_path}" /System/Library/Extensions
     sudo chown -R root:wheel /System/Library/Extensions/"${new_kext}"
     sudo chmod  -R 755 /System/Library/Extensions/"${new_kext}"

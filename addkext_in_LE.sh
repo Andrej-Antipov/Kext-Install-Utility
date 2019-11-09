@@ -305,7 +305,7 @@ if [[ ${extension} = "kext" ]] || [[ ${extension} = "bundle" ]] || [[ ${extensio
 
     BACKUP_EXTENSION
 
-    if [[ -d /Library/Extensions/"${new_kext}" ]]; then sudo rm -Rf /Library/Extensions/"${new_kext}"; fi
+    if [[ -d /Library/Extensions/"${new_kext}" ]] && [[ ! /Library/Extensions/"${new_kext}" = "/Library/Extensions/" ]]; then sudo rm -Rf /Library/Extensions/"${new_kext}"; fi
     sudo cp -a "${new_path}" /Library/Extensions
     sudo chown -R root:wheel /Library/Extensions/"${new_kext}"
     sudo chmod  -R 755 /Library/Extensions/"${new_kext}"
