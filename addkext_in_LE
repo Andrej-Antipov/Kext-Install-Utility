@@ -342,11 +342,6 @@ fi
 
 function ProgressBar {
 let _progress=(${1}*100/${2}*100)/100
-#let _done=(${_progress}*4)/10
-#let _left=40-$_done
-#_fill=$(printf "%${_done}s")
-#_empty=$(printf "%${_left}s")
-#printf "\r    \033[18C[${_fill// /.}${_empty// / } ]  ${_progress}%%"
 printf "\r    \033[20C\e[1;32m[ ${_progress}%% ] \e[0m"
 }
 
@@ -393,8 +388,7 @@ printf "\r\033[33C"
 spin="/|\\-/|\\-"; i=0
 while :; do for i in `seq 0 7`;  do printf '\r\033[34C\e[1;32m'"${spin:$i:1}"; echo -en "\010\033[0m";  sleep 0.05; done; done &
 trap "kill $!" EXIT 
-#sudo kextcache -i / &> ~/Desktop/KernelCacheUpdate.log.txt >/dev/null
-sleep 5
+sudo kextcache -i / &> ~/Desktop/KernelCacheUpdate.log.txt >/dev/null
 kill $!
 wait $! 2>/dev/null
 trap " " EXIT
