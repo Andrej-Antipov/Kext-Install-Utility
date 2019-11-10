@@ -319,7 +319,7 @@ UPDATE_KERNEL_CACHE(){
 osascript -e 'tell application "Terminal" to activate'
 SET_INPUT
 if [[ $large_window = 1 ]]; then sz=100; else sz=74; fi
-let lines="path_count*2+12"; clear && printf '\e[8;'$lines';'$sz't' && printf '\e[3J' && printf "\033[H"
+if [[ $path_count -gt 5 ]]; then let lines="path_count*2+12"; clear && printf '\e[8;'$lines';'$sz't' && printf '\e[3J' && printf "\033[H"; fi
 echo ${vbuf}
 echo
 echo
