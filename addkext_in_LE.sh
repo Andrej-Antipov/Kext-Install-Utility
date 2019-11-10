@@ -514,6 +514,7 @@ DELETE_KEXTS(){
         else
            for ((l=0;l<$tmcount;l++)) do kext_name=$(echo "${tmlist[l]}" | xargs); DELETE_KEXT;  done
         fi
+           path_count=$tmcount
            if [[ $not_found = 0 ]]; then UPDATE_KERNEL_CACHE ; else SLEEP_READ 3 ; fi
 
 }
@@ -568,9 +569,9 @@ printf '\r                                                                      
 fi
 }
 
-WINDOW_ON(){ if [[ $window_visible = 0 ]]; then osascript -e 'tell application "Terminal" to set visible  of last  window to true'; window_visible=1; fi }
+WINDOW_ON(){ if [[ $window_minimizable = 1 ]] && [[ $window_visible = 0 ]]; then osascript -e 'tell application "Terminal" to set visible  of last  window to true'; window_visible=1; fi }
 
-WINDOW_OFF(){ if [[ $window_visible = 1 ]]; then  osascript -e 'tell application "Terminal" to set miniaturized of front window to true'; window_visible=0; fi }
+WINDOW_OFF(){ if [[ $window_minimizable = 1 ]] && [[ $window_visible = 1 ]]; then  osascript -e 'tell application "Terminal" to set miniaturized of front window to true'; window_visible=0; fi }
 
 
 ###################### main ##############################################################################################
@@ -590,6 +591,7 @@ MyTTY=`tty | tr -d " dev/\n"`
 term=`ps`;  MyTTYcount=`echo $term | grep -Eo $MyTTY | wc -l | tr - " \t\n"`
 wait_on_exit=0
 window_visible=1
+window_minimizable=1
 printf "\033[?25l"
 macos=$(sw_vers -productVersion | cut -f1-2 -d"." | tr -d '.')
 if [[ "${macos}" = "1015" ]]; then 
