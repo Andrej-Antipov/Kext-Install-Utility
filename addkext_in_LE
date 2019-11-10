@@ -250,7 +250,7 @@ if [[ -f ~/.zsh_history ]]; then cat  ~/.zsh_history | sed -n '/addkext_in_LE/!p
 EXIT_PROGRAM(){
 ################################## очистка на выходе #############################################################
 CLEAR_HISTORY 
-
+if [[ $window_visible = 0 ]]; then osascript -e 'tell application "Terminal" to set visible  of last  window to true'; window_visible=1; fi
 #####################################################################################################################
 
 CHECK_TTY_COUNT	
@@ -601,6 +601,11 @@ printf '\r                                                                      
 fi
 }
 
+WINDOW_ON(){ if [[ $window_visible = 0 ]]; then osascript -e 'tell application "Terminal" to set visible  of last  window to true'; window_visible=1; fi }
+
+WINDOW_OFF(){ if [[ $window_visible = 1 ]]; then  osascript -e 'tell application "Terminal" to set miniaturized of front window to true'; window_visible=0; fi }
+
+
 ###################### main ##############################################################################################
 
 clear
@@ -612,11 +617,12 @@ osascript -e "tell application \"Terminal\" to set background color of window 1 
 osascript -e "tell application \"Terminal\" to set normal text color of window 1 to {65535, 65535, 65535}"
 
 
-clear && printf '\e[8;22;100t' && printf '\e[3J' && printf "\033[H"
+clear && printf '\e[8;22;80t' && printf '\e[3J' && printf "\033[H"
 loc=`defaults read -g AppleLocale | cut -d "_" -f1`
 MyTTY=`tty | tr -d " dev/\n"`
 term=`ps`;  MyTTYcount=`echo $term | grep -Eo $MyTTY | wc -l | tr - " \t\n"`
 wait_on_exit=0
+window_visible=1
 printf "\033[?25l"
 macos=$(sw_vers -productVersion | cut -f1-2 -d"." | tr -d '.')
 if [[ "${macos}" = "1015" ]]; then 
@@ -652,10 +658,11 @@ SET_INPUT
 ################ get args string ##########################################################
 
 if [[ ! -f ~/.patches.txt ]]; then 
-
+ 
 
     var1=0; while [[ $var1 = 0 ]]; do
 
+    WINDOW_OFF
 
              GET_APP_ICON
 
@@ -671,18 +678,21 @@ if [[ ! -f ~/.patches.txt ]]; then
              answer=$(echo "${answer}"  | cut -f2 -d':' )
             
 if [[ "${answer}" = "Install" ]] || [[ "${answer}" = "Установка" ]]; then
-    n=4
-            if [[ $loc = "ru" ]]; then
-        printf '\033['${n}';0f''\e[1;33m     Выберите кексты для установки !    \e[0m '
-            else
-        printf '\033['${n}';0f''\e[1;33m     Select the kexts to install  !    \e[0m '
-            fi
+        #n=4
+       #     if [[ $loc = "ru" ]]; then
+        #printf '\033['${n}';0f''\e[1;33m     Выберите кексты для установки !    \e[0m '
+        #    else
+        #printf '\033['${n}';0f''\e[1;33m     Select the kexts to install  !    \e[0m '
+        #    fi
 
     sleep 0.3
     open -W AskKexts.app
 
     clear && printf '\e[3J' && printf "\033[H"
     if [[ -f ~/.patches.txt ]]; then  
+
+    WINDOW_ON
+
         no_kexts=0
 
         GET_ARGS
@@ -717,13 +727,13 @@ if [[ "${answer}" = "Install" ]] || [[ "${answer}" = "Установка" ]]; th
     if [[ ! $strng = "" ]]; then  ASK_TO_DELETE_FROM
 
         if [[ $cancel = 2 ]]; then break; fi
-        if [[ $cancel = 0 ]]; then  DELETE_KEXTS ; break; fi
+        if [[ $cancel = 0 ]]; then  WINDOW_ON; DELETE_KEXTS ; break; fi
 
     else
 
          ASK_FOLDER_TO_DELETE
          if [[ $strng = "" ]] && [[ $cancel = 1 ]]; then break; fi
-         if [[ $cancel = 0 ]]; then DELETE_KEXTS; break; fi
+         if [[ $cancel = 0 ]]; then WINDOW_ON; DELETE_KEXTS; break; fi
     fi
     done
  fi
