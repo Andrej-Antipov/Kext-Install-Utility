@@ -1,76 +1,41 @@
 #!/bin/bash
 
-# функция отладки ##################################################################################################
-
-deb=0
-
-DEBUG(){
-if [[ ! $deb = 0 ]]; then
-printf '\n\n Останов '"$stop"'  :\n\n' >> ~/temp.txt 
-printf '............................................................\n' >> ~/temp.txt
-#echo "patches.txt = " >> ~/temp.txt
-#cat ~/.spatches.txt >> ~/temp.txt
-#echo " " >> ~/temp.txt
-echo "kmcount = ""${kmcount}" >> ~/temp.txt
-echo "kmlist = ""${kmlist[@]}" >> ~/temp.txt
-echo "kmlist/i = ""${kmlist[i]}" >> ~/temp.txt
-echo "i = ""${i}" >> ~/temp.txt
-echo " " >> ~/temp.txt
-echo "new_path = ""${new_path}" >> ~/temp.txt
-echo " " >> ~/temp.txt
-echo "kext_path = ""${kext_path}" >> ~/temp.txt
-echo "result = ""${result}" >> ~/temp.txt
-echo " " >> ~/temp.txt
-echo "old_kext = ""${old_kext}" >> ~/temp.txt
-echo "tmlist/l/ = ""${tmlist[l]}" >> ~/temp.txt
-echo " " >> ~/temp.txt
-echo "m = ""${m}" >> ~/temp.txt
-#echo "l = ""${l}" >> ~/temp.txt
-echo "tmlist = ""${tmlist[@]}" >> ~/temp.txt
-echo "tmcount= ""${tmcount}" >> ~/temp.txt
-echo "strng = ""$strng" >> ~/temp.txt
-#echo "folder_trailed_count = "${#folder_trailed[@]} >> ~/temp.txt
-
-printf '............................................................\n\n' >> ~/temp.txt
-sleep 0.2
-read -n 1 -s
-fi
-}
-#########################################################################################################################################
-
 UPDATE_CACHE(){
-if [[ -f ~/Library/Application\ Support/KextSLEinstaller/InstalledKext.plist ]]; then KextLEconf=$( cat ~/Library/Application\ Support/KextSLEinstaller/InstalledKext.plist ); cache=1
+if [[ -f ~/Library/Application\ Support/KextSLEinstaller/InstalledKext.plist ]]; then KextSLEconf=$( cat ~/Library/Application\ Support/KextSLEinstaller/InstalledKext.plist ); cache=1
 else
-    unset KextLEconf; cache=0
+    unset KextSLEconf; cache=0
 fi
 }
+
+SLEEP_READ(){ osascript -e 'tell application "Terminal" to activate'; for ((i=0;i<$1;i++)) do read -r -s -n 1 -t 1; done }
+
+ANY_KEY(){ while true; do if $(read -r -s -n 1 -t 1); then break; fi; done }
 
 ASK_KEXTS_TO_DELETE(){
 if [[ $loc = "ru" ]]; then
 osascript <<EOD
 tell application "System Events"    activate
 set ThemeList to {$file_list}
-set FavoriteThemeAnswer to choose from list ThemeList with title "Удалить установленные файлы" with prompt "Выберите один или несколько файлов" default items "Basic" with multiple selections allowed#set FavoriteThemeAnswer to FavoriteThemeAnswer's item 1 (* extract choice from list *)
+set FavoriteThemeAnswer to choose from list ThemeList with title "Удалить установленные файлы"  with prompt "Выберите один или несколько файлов"  default items "Basic" with multiple selections allowed 
 end tell
 EOD
 else
 osascript <<EOD
 tell application "System Events"    activate
 set ThemeList to {$file_list}
-set FavoriteThemeAnswer to choose from list ThemeList with title "Delete installed files" with prompt "Select one or more files" default items "Basic" with multiple selections allowed#set FavoriteThemeAnswer to FavoriteThemeAnswer's item 1 (* extract choice from list *)
+set FavoriteThemeAnswer to choose from list ThemeList with title "Delete installed files" with prompt "Select one or more files" default items "Basic" with multiple selections allowed
 end tell
 EOD
 fi
 }
 
 DEL_KEXT_IN_PLIST(){ # kext_name ->
-strng=`echo "$KextLEconf" | grep -A 1 "<key>Installed</key>" | grep string | sed -e 's/.*>\(.*\)<.*/\1/' | tr -d '\n'`
-if [[ "${strng}" = "" ]]; then kcount=0; klist=()
-else
-IFS=';'; klist=( ${strng} ); unset IFS
-kcount=${#klist[@]}
-fi
-if [[ ! $kcount = 0 ]]; then
+strng=`echo "$KextSLEconf" | grep -A 1 "<key>Installed</key>" | grep string | sed -e 's/.*>\(.*\)<.*/\1/' | tr -d '\n'`
+if [[ ! "${strng}" = "" ]]; then 
+
+    IFS=';'; klist=( ${strng} ); unset IFS; kcount=${#klist[@]}
+
+    if [[ ! $kcount = 0 ]]; then
          var=$kcount; posk=0; tlist=()
             while [[ ! $var = 0 ]]
          do
@@ -89,11 +54,12 @@ if [[ ! $kcount = 0 ]]; then
         done
         
         plutil -replace Installed -string "${strng}" ~/Library/Application\ Support/KextSLEinstaller/InstalledKext.plist; UPDATE_CACHE
+    fi
 fi  
 }
 
 ADD_KEXT_IN_PLIST(){ # new_kext -> 
-strng=`echo "$KextLEconf" | grep -A 1 "<key>Installed</key>" | grep string | sed -e 's/.*>\(.*\)<.*/\1/' | tr -d '\n'`
+strng=`echo "$KextSLEconf" | grep -A 1 "<key>Installed</key>" | grep string | sed -e 's/.*>\(.*\)<.*/\1/' | tr -d '\n'`
 if [[ ! "${strng}" = "" ]]; then 
 IFS=';'; klist=( ${strng} ); unset IFS
 kcount=${#klist[@]}
@@ -232,33 +198,16 @@ let "TTYcount=AllTTYcount-MyTTYcount"
 }
 
 CLEAR_HISTORY(){
-if [[ -f ~/.bash_history ]]; then cat  ~/.bash_history | sed -n '/addkext_in_LE/!p' >> ~/new_hist.txt; rm -f ~/.bash_history; mv ~/new_hist.txt ~/.bash_history ; fi >/dev/null 2>/dev/null
-if [[ -f ~/.zsh_history ]]; then cat  ~/.zsh_history | sed -n '/addkext_in_LE/!p' >> ~/new_z_hist.txt; rm -f ~/.zsh_history; mv ~/new_z_hist.txt ~/.zsh_history ; fi >/dev/null 2>/dev/null
+if [[ -f ~/.bash_history ]]; then cat  ~/.bash_history | sed -n '/addkext_in_SLE/!p' >> ~/new_hist.txt; rm -f ~/.bash_history; mv ~/new_hist.txt ~/.bash_history ; fi >/dev/null 2>/dev/null
+if [[ -f ~/.zsh_history ]]; then cat  ~/.zsh_history | sed -n '/addkext_in_SLE/!p' >> ~/new_z_hist.txt; rm -f ~/.zsh_history; mv ~/new_z_hist.txt ~/.zsh_history ; fi >/dev/null 2>/dev/null
 }
 
 ################## Выход из программы с проверкой - выгружать терминал из трея или нет #####################################################
 EXIT_PROGRAM(){
 ################################## очистка на выходе #############################################################
 CLEAR_HISTORY 
-if [[ $wait_on_exit = 1 ]]; then  
-osascript -e 'tell application "Terminal" to activate'
-if [[ $loc = "ru" ]]; then
-                printf '\n\n                               Нажмите любую клавишу для завершения '
-                    else
-                printf '\n\n                                     Press any key to exit '
-                    fi
-read -n1 -s 
-fi
+if [[ $window_visible = 0 ]]; then osascript -e 'tell application "Terminal" to set visible  of last  window to true'; window_visible=1; fi 
 #####################################################################################################################
-if [[ $textedit_flag = 1 ]]; then
-  textedit_now=$(ps -xao tty,pid,command | grep -v grep | grep "TextEdit" | wc -l | tr -d ' ')
-  if [[ $textedit_now -gt 0 ]]; then let "textedit_count=textedit_now-1"
-    if [[ $textedit_count = 0 ]]; then osascript -e 'tell app "TextEdit" to close first  window' && osascript -e 'quit app "TextEdit.app"' >/dev/null 2>/dev/null
-        else
-            osascript -e 'tell app "TextEdit" to close first  window' >/dev/null 2>/dev/null
-    fi
-  fi
-fi
 
 CHECK_TTY_COUNT	
 if [[ ${TTYcount} = 0  ]]; then   osascript -e 'tell application "Terminal" to close first window' && osascript -e 'quit app "terminal.app"' & exit
@@ -271,14 +220,26 @@ fi
 DELETE_KEXT(){
 
     let "n++"; let "n++"
-    if [[ -d /System/Library/Extensions/"${kext_name}" ]] && [[ ! /System/Library/Extensions/"${kext_name}" = "/System/Library/Extensions/" ]]; then new_kext="${kext_name}"; BACKUP_EXTENSION; sudo rm -Rf /System/Library/Extensions/"${kext_name}"; update_cache=1; fi
+if [[ ! -d /System/Library/Extensions/"${kext_name}" ]]; then 
     if [[ $loc = "ru" ]]; then
-    printf '\033['${n}';20f''\e[1;31m     Удалён:    \e[1;33m'"${kext_name}"'\e[0m '
+    vbuf+=$( printf '\033['${n}';20f''\e[1;31m     Не найден:    \e[1;33m'"${kext_name}"'\e[0m ' )
     else
-    printf '\033['${n}';20f''\e[1;31m     Deleted:    \e[1;33m'"${kext_name}"'\e[0m '
+    vbuf+=$( printf '\033['${n}';20f''\e[1;31m     Not found:    \e[1;33m'"${kext_name}"'\e[0m ' )
+    fi
+    not_found=1
+
+else
+    not_found=0
+    if [[ ! /System/Library/Extensions/"${kext_name}" = "/System/Library/Extensions/" ]]; then new_kext="${kext_name}"; BACKUP_EXTENSION; sudo rm -Rf /System/Library/Extensions/"${kext_name}"; update_cache=1; fi
+    if [[ $loc = "ru" ]]; then
+    vbuf+=$( printf '\033['${n}';20f''\e[1;31m     Удалён:    \e[1;33m'"${kext_name}"'\e[0m ' )
+    else
+    vbuf+=$( printf '\033['${n}';20f''\e[1;31m     Deleted:    \e[1;33m'"${kext_name}"'\e[0m ' )
     fi
 
-    DEL_KEXT_IN_PLIST
+     DEL_KEXT_IN_PLIST
+
+fi
 
 }
 
@@ -291,11 +252,11 @@ let "n++"; let "n++"
 if [[ ${extension} = "kext" ]] || [[ ${extension} = "bundle" ]] || [[ ${extension} = "plugin" ]]; then 
     update_cache=1
     if [[ $loc = "ru" ]]; then
-    printf '\033['${n}';0f''     Установлен:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m'
+    vbuf+=$( printf '\033['${n}';7f''     Установлен:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m' )
     else
-    printf '\033['${n}';0f''      Installed:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m'
+    vbuf+=$( printf '\033['${n}';7f''      Installed:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m' )
     fi
-    if [[ ! $old_ver = "" ]]; then  printf ' -   was ver. \e[1;31m'$old_ver'\e[0m \n' else printf '\n'; fi
+    if [[ ! $old_ver = "" ]]; then large_window=1;  vbuf+=$( printf ' -      was ver. \e[1;31m'$old_ver'\e[0m \n' else printf '\n' ) ; fi 
     
     echo $mypassword | sudo -S printf '' >/dev/null 2>/dev/null
 
@@ -310,12 +271,10 @@ if [[ ${extension} = "kext" ]] || [[ ${extension} = "bundle" ]] || [[ ${extensio
     else
     wait_on_exit=1
     if [[ $loc = "ru" ]]; then
-    printf '\033['${n}';0f''\e[1;31m  НЕ установлен:    \e[1;33m''\033['${n}';'$corr'f'${new_kext}'\033['${n}';54f''\e[0m'
+    vbuf+=$( printf '\033['${n}';7f''\e[1;31m  НЕ установлен:    \e[1;33m''\033['${n}';'$corr'f'${new_kext}'\033['${n}';54f''\e[0m' )
     else
-    printf '\033['${n}';0f''\e[1;31m  NOT Installed:    \e[1;33m''\033['${n}';'$corr'f'${new_kext}'\033['${n}';54f''\e[0m'
+    vbuf+=$( printf '\033['${n}';7f''\e[1;31m  NOT Installed:    \e[1;33m''\033['${n}';'$corr'f'${new_kext}'\033['${n}';54f''\e[0m' )
     fi
-
-
 fi
 }
 
@@ -329,18 +288,16 @@ fi
 BACKUP_EXTENSION(){
 if [[ -d /System/Library/Extensions/"${new_kext}" ]]; then
 if [[ ! -d ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}" ]]; then mkdir -p ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}"; fi
-if [[ ! -d ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}"/"${new_kext}" ]]; then cp -a /System/Library/Extensions/"${new_kext}" ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}"; fi
+    if [[ ! -d ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}"/"${new_kext}" ]]; then 
+        rsync -avq /System/Library/Extensions/"${new_kext}" ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}"; fi 2>&-
 fi
 }
 
 function ProgressBar {
 let _progress=(${1}*100/${2}*100)/100
-let _done=(${_progress}*4)/10
-let _left=40-$_done
-_fill=$(printf "%${_done}s")
-_empty=$(printf "%${_left}s")
-printf "\r    \033[18C[${_fill// /.}${_empty// / } ]  ${_progress}%%"
+printf "\r    \033[20C\e[1;32m[ ${_progress}%% ] \e[0m"
 }
+
 
 TIMEOUT(){
 _start=1
@@ -353,43 +310,104 @@ done
 }
 
 GET_KEXT_INFO(){
-sver="${new_path}"
-sver="$(plutil -p "${sver}"/Contents/Info.plist | grep CFBundleShortVersionString | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
+sver="$(plutil -p "${new_path}"/Contents/Info.plist | grep CFBundleShortVersionString | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
+if [[ $sver = "" ]]; then 
+sver="$(plutil -p "${new_path}"/Info.plist | grep CFBundleShortVersionString | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
+fi
 old_ver=""
 old_ver="$(plutil -p /System/Library/Extensions/"${new_kext}"/Contents/Info.plist | grep CFBundleShortVersionString  | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
+if [[ $old_ver = "" ]]; then
+old_ver="$(plutil -p /System/Library/Extensions/"${new_kext}"/Info.plist | grep CFBundleShortVersionString  | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
+fi
 }
 
 UPDATE_KERNEL_CACHE(){
 osascript -e 'tell application "Terminal" to activate'
-
 SET_INPUT
-
+if [[ $path_count -gt 5 ]]; then let lines="path_count*2+12"; else lines=22; fi
+if [[ $large_window = 1 ]]; then sz=100; else sz=74; fi 
+clear && printf '\e[8;'$lines';'$sz't' && printf '\e[3J' && printf "\033[H"
+echo ${vbuf}
 echo
 echo
+if [[ $loc = "ru" ]]; then
+echo "       Обновить кэш (y/N) ?"
+else
 echo "       Update cache (y/N) ?"
-read  -s -r  -n 1  input
+fi
+while true; do unset input; read  -s -r  -n 1 -t 1 input ; if [[ ! $input = "" ]]; then break; fi; done
 printf '\r\033[1A'
 if [[ ${input} = [yY] ]]; then 
 wait_on_exit=1
-printf '\e[1;36m     updating kernel cache ....\e[0m'
+if [[ $loc = "ru" ]]; then
+printf '\e[1;36m     обновление кэша ядра  .... \e[0m'
+else
+printf '\e[1;36m     updating kernel cache .... \e[0m'
+fi
 rm -f ~/Desktop/KernelCacheUpdate.log.txt
-while :;do printf '\e[1;36m.\e[0m' ;sleep 2;done &
+
+printf "\r\033[33C"
+spin="/|\\-/|\\-"; i=0
+while :; do for i in `seq 0 7`;  do printf '\r\033[34C\e[1;32m'"${spin:$i:1}"; echo -en "\010\033[0m";  sleep 0.05; done; done &
 trap "kill $!" EXIT 
 sudo kextcache -i / &> ~/Desktop/KernelCacheUpdate.log.txt >/dev/null
 kill $!
 wait $! 2>/dev/null
 trap " " EXIT
+if [[ $loc = "ru" ]]; then
+printf '\r\e[1;36m           кэш ядра обновлён                    \e[0m'
+else
+printf '\r\e[1;36m           kernel cache was updated             \e[0m'
+fi
 echo
 echo
 text_edit_flag=0
-if [[ -f ~/Desktop/KernelCacheUpdate.log.txt ]]; then textedit_flag=1; open -a "TextEdit" -n  ~/Desktop/KernelCacheUpdate.log.txt; osascript -e 'tell application "Terminal" to activate'; fi
-printf '\r\n\e[1;36m     timeout after: \e[1;32m'  
+if [[ -f ~/Desktop/KernelCacheUpdate.log.txt ]]; then log=$(cat /Users/andrej/Desktop/KernelCacheUpdate.log.txt); if [[ ! $log = "" ]]; then
+textedit_flag=1; open -a "TextEdit" -n  ~/Desktop/KernelCacheUpdate.log.txt; osascript -e 'tell application "Terminal" to activate'; fi
+fi
+if [[ $loc = "ru" ]]; then
+printf '\r\n\e[1;36m           таймаут: \e[1;32m'
+else
+printf '\r\n\e[1;36m           timeout: \e[1;32m'
+fi
+printf "\r\033[18C"
+spin="/|\\-/|\\-"; i=0
+while :; do for i in `seq 0 7`;  do printf '\r\033[34C\e[1;32m'"${spin:$i:1}"; echo -en "\010\033[0m";  sleep 0.05; done; done &
+trap "kill $!" EXIT
 TIMEOUT
+kill $!
+wait $! 2>/dev/null
+trap " " EXIT
 printf '\e[0m\r''                                                                       \n\n'
 fi
 printf '\r                                \n'
 printf '\r\033[6A'
-printf "%"100"s"'\n'"%"100"s"'\n'"%"100"s"'\n'"%"100"s"'\n'"%"100"s"'\n'"%"100"s"'\n'"%"100"s"
+if [[ $sz = 74 ]]; then
+printf "%"74"s"'\n'"%"74"s"'\n'"%"74"s"'\n'"%"74"s"'\n'
+else
+printf "%"100"s"'\n'"%"100"s"'\n'"%"100"s"'\n'"%"100"s"'\n'
+fi
+if [[ $wait_on_exit = 1 ]]; then  
+osascript -e 'tell application "Terminal" to activate'
+                    if [[ $loc = "ru" ]]; then
+                if [[ $sz = 100 ]]; then cor=39; else cor=26; fi
+                printf '\n\n\r\033['$cor'CНажмите любую клавишу               '
+                    else
+                if [[ $sz = 100 ]]; then cor=43; else cor=30; fi
+                printf '\n\n\r\033['$cor'CPress any key                       '
+                    fi
+ANY_KEY
+
+fi
+if [[ $textedit_flag = 1 ]]; then
+  textedit_now=$(ps -xao tty,pid,command | grep -v grep | grep "TextEdit" | wc -l | tr -d ' ')
+  if [[ $textedit_now -gt 0 ]]; then let "textedit_count=textedit_now-1"
+    if [[ $textedit_count = 0 ]]; then osascript -e 'tell app "TextEdit" to close first  window' && osascript -e 'quit app "TextEdit.app"' >/dev/null 2>/dev/null
+        else
+            osascript -e 'tell app "TextEdit" to close first  window' >/dev/null 2>/dev/null
+    fi
+  fi
+fi
 }
 
 GET_ARGS(){
@@ -397,31 +415,33 @@ get_args="$(cat  ~/.spatches.txt | tr '\n' ';' | xargs )"
 all_path=(); var=0; m=1; while [[ $var = 0 ]]; do str="$(echo $get_args | cut -f"${m}" -d ';')"; if [[ ! $str = "" ]]; then all_path+=( "${str}" ); let "m++"; else break; fi; done
 path_count=${#all_path[@]}
 rm -f ~/.spatches.txt
+
 }
 
 TRAIL_FOLDER(){
 all_path_trailed=()
 for ((l=0;l<$path_count;l++)) do 
 new_path="$(echo "${all_path[l]}" | xargs)"; new_kext=$(echo "${new_path}" | sed 's|.*/||')
-  if [[ ! -f "${new_path}" ]]; then 
-    if [[ ! "${new_path}" = "/System/Library/Extensions" ]] &&  [[ ! "$( echo "${new_path}" | sed 's/[^/]*$//' )" = "/System/Library/Extensions/" ]];  then
+   if [[ ! -f "${new_path}" ]]; then 
+     if [[ ! "${new_path}" = "/System/Library/Extensions" ]] &&  [[ ! "$( echo "${new_path}" | sed 's/[^/]*$//' )" = "/System/Library/Extensions/" ]];  then
       if [[ -d "${new_path}" ]]; then 
-        if [[ -f "${new_path}"/Contents/Info.plist ]]; then all_path_trailed+=( "$(echo "${all_path[l]}" | xargs)" )
+        if [[ -f "${new_path}"/Contents/Info.plist ]] || [[ -f "${new_path}"/Info.plist && ( "${new_kext##*.}" = "kext" || "${new_kext##*.}" = "plugin" ) || "${new_kext##*.}" = "bundle" ]]; then all_path_trailed+=( "$(echo "${all_path[l]}" | xargs)" )
             else
                 get_args="$( find "${new_path}" -maxdepth 1 -type d -not -path "${new_path}" | tr '\n' ';' | xargs )"
                 folder_trailed=(); var=0; m=1; while [[ $var = 0 ]]; do str="$(echo $get_args | cut -f"${m}" -d ';')"; if [[ ! $str = "" ]]; then folder_trailed+=( "${str}" ); let "m++"; else break; fi; done
                 folder_trailed_count=${#folder_trailed[@]}
                 if [[ ! $folder_trailed_count = 0 ]]; then 
                     for ((i=0;i<$folder_trailed_count;i++)) do 
+                    trailed_kext=$(echo "$(echo "${folder_trailed[i]}" | xargs)" | sed 's|.*/||')
                     if [[ ! -f "$(echo "${folder_trailed[i]}" | xargs)" ]]; then
-                        if [[ -f "$(echo "${folder_trailed[i]}" | xargs)"/Contents/Info.plist ]]; then  all_path_trailed+=( "$(echo "${folder_trailed[i]}" | xargs)" ); fi
+                        if [[ -f "$(echo "${folder_trailed[i]}" | xargs)"/Contents/Info.plist ]] || [[ -f "$(echo "${folder_trailed[i]}" | xargs)"/Info.plist && ( "${trailed_kext##*.}" = "kext" || "${trailed_kext##*.}" = "plugin" ) || "${trailed_kext##*.}" = "bundle" ]]; then  all_path_trailed+=( "$(echo "${folder_trailed[i]}" | xargs)" ); fi
                     fi
                     done
                 fi
         fi
       fi
-    fi
-  fi
+     fi
+   fi
 done
 all_path=( "${all_path_trailed[@]}" ); path_count=${#all_path[@]}
 }
@@ -429,18 +449,102 @@ all_path=( "${all_path_trailed[@]}" ); path_count=${#all_path[@]}
 INSTALL_KEXTS(){
 osascript -e 'tell application "Terminal" to activate'
 CREATE_TIMESTAMP
-n=0; corr=0
+n=0; corr=0; vbuf=""; large_window=0
+if [[ $loc = "ru" ]]; then
+printf '\r\n\e[1;36m              Установка расширений: \e[1;32m'
+else
+printf '\r\n\e[1;36m         Installing the extensions: \e[1;32m'
+fi
+printf "\r\033[18C"
+spin="/|\\-/|\\-"; i=0
+while :; do for i in `seq 0 7`;  do printf '\r\033[38C\e[1;32m'"${spin:$i:1}"; echo -en "\010\033[0m";  sleep 0.05; done; done &
+trap "kill $!" EXIT
 for ((i=0;i<$path_count;i++)) do 
 new_path="$(echo "${all_path[i]}" | xargs)"
 new_kext=$(echo "${new_path}" | sed 's|.*/||'); p=${#new_kext}; let "corr=(36-p)/2+21"
 GET_KEXT_INFO
 CHECK_INSTALL_KEXTS
 done
+kill $!
+wait $! 2>/dev/null
+trap " " EXIT
+printf '\e[0m\r''                                                                       \n\n'
 }
 
 GET_INSTALLED_STRING(){
 UPDATE_CACHE
-    if [[ ${cache} = 1 ]]; then strng=`echo "$KextLEconf" | grep -A 1 "<key>Installed</key>" | grep string | sed -e 's/.*>\(.*\)<.*/\1/' | tr -d '\n'`; fi
+    if [[ ${cache} = 1 ]]; then strng=`echo "$KextSLEconf" | grep -A 1 "<key>Installed</key>" | grep string | sed -e 's/.*>\(.*\)<.*/\1/' | tr -d '\n'`; fi
+    if [[ ! $strng = "" ]]; then  IFS=';'; kmlist=( ${strng} ); unset IFS; kmcount=${#kmlist[@]}; file_list=""
+                    for ((i=0;i<$kmcount;i++)) do old_kext="${kmlist[i]}"; file_list+='"'${old_kext}'"' ; if [[ ! $i = $(( $kmcount-1 )) ]]; then file_list+=","; fi ; done
+            else kmlist=(); kmcount=0
+    fi
+}
+
+ASK_FOLDER_TO_DELETE(){
+from_list=0
+ if [[ $loc = "ru" ]]; then prompt='"ВЫБЕРИТЕ ФАЙЛЫ ДЛЯ УДАЛЕНИЯ ИЗ /System/Library/Extensions:"'; else prompt='"SELECT FILES TO DELETE FROM /System/Library/Extensions:"'; fi
+
+alias_string='"'"$(echo "$(diskutil info $(df / | tail -1 | cut -d' ' -f 1 ) |  grep "Volume Name:" | cut -d':'  -f 2 | xargs)")"':System:Library:Extensions"'
+if answer=$(osascript -e 'tell application "Terminal" to (choose file default location alias '"${alias_string}"' with prompt '"${prompt}"' with multiple selections allowed)'); then cancel=0; else cancel=1; fi 2>/dev/null 
+if [[ $answer = "" ]]; then cancel=1; else cancel=0
+IFS=","; array=( $answer ); unset IFS; size=${#array[@]}; unset result; for ((i=0;i<$size;i++)) do result+="$(echo ${array[i]} | rev | cut -f2 -d ':' | rev)"; if [[ ! $i = $(( $size-1 )) ]]; then result+="," ; fi ;  done
+fi
+}
+
+ASK_TO_DELETE_FROM(){
+            
+                if [[ $loc = "ru" ]]; then
+             if answer=$(osascript -e 'display dialog "Выбрать файлы из /System/Library/Extensions или из списка ранее установленных?" '"${icon_string}"' buttons {"Удаление из системной папки", "Удаление через список", "Отмена" } default button "Удаление через список" '); then cancel=0; else cancel=1; fi 2>/dev/null
+                                else
+             if answer=$(osascript -e 'display dialog "Select files from /System/Library/Extensions or from a list of previously installed ones?" '"${icon_string}"' buttons {"Choose from the system folder", "Choose from the list", "Cancel" } default button "Choose from the list" '); then cancel=0; else cancel=2; fi 2>/dev/null
+                                fi
+            if [[ $cancel = 2 ]]; then answer="Cancel"; else answer=$(echo "${answer}"  | cut -f2 -d':' ); fi
+
+                    case "$answer" in
+
+            "Удаление из системной папки"   ) ASK_FOLDER_TO_DELETE ;;
+            "Choose from the system folder" ) ASK_FOLDER_TO_DELETE ;;
+            "Удаление через список"         ) rom_list=1; if result=$(ASK_KEXTS_TO_DELETE); then cancel=0; else cancel=1; fi ; if [[ $result = "false" ]]; then cancel=1; else cancel=0; fi ;;
+            "Choose from the list"          ) rom_list=1; if result=$(ASK_KEXTS_TO_DELETE); then cancel=0; else cancel=1; fi ; if [[ $result = "false" ]]; then cancel=1; else cancel=0; fi ;;
+            "Отмена"                        ) cancel=2 ;;
+            "Cancel"                        ) cancel=2 ;;
+                                           *) cancel=1 ;;
+                    esac
+            
+}
+
+
+DELETE_KEXTS(){
+           if ! GET_PASSWORD; then EXIT_PROGRAM; fi
+           echo $mypassword | sudo -S printf '' >/dev/null 2>/dev/null
+           IFS=","; tmlist=( ${result} ); unset IFS; tmcount=${#tmlist[@]}
+           osascript -e 'tell application "Terminal" to activate'
+           CREATE_TIMESTAMP
+           n=0; corr=0 ; large_window=0; vbuf=""
+            if [[ $loc = "ru" ]]; then
+            printf '\r\n\e[1;36m               Удаление расширений: \e[1;32m'
+            else
+            printf '\r\n\e[1;36m           Deleting the extensions: \e[1;32m'
+            fi
+            printf "\r\033[18C"
+            spin="/|\\-/|\\-"; i=0
+            while :; do for i in `seq 0 7`;  do printf '\r\033[38C\e[1;32m'"${spin:$i:1}"; echo -en "\010\033[0m";  sleep 0.05; done; done &
+            trap "kill $!" EXIT
+        if [[ $from_list = 1 ]]; then 
+           for ((i=0;i<$kmcount;i++)) do
+           old_kext="${kmlist[i]}"
+           for ((l=0;l<$tmcount;l++)) do if [[ "${old_kext}" = $(echo "${tmlist[l]}" | xargs) ]]; then  kext_name="${old_kext}"; DELETE_KEXT; break; fi ; done
+           done
+        else
+           for ((l=0;l<$tmcount;l++)) do kext_name=$(echo "${tmlist[l]}" | xargs); DELETE_KEXT;  done
+        fi
+            kill $!
+            wait $! 2>/dev/null
+            trap " " EXIT
+            printf '\e[0m\r''                                                                       \n\n'
+           path_count=$tmcount
+           if [[ $not_found = 0 ]]; then UPDATE_KERNEL_CACHE ; else SLEEP_READ 3 ; fi
+
 }
 
 SET_INPUT(){
@@ -491,11 +595,16 @@ printf '\r                                                                      
  printf "\r\n\033[3A\033[46C" ; if [[ $order = 3 ]]; then printf "\033[3C"; fi   fi
 
 fi
+
 }
 
-###################### main #########################################################
+#WINDOW_ON(){ if [[ $window_minimizable = 1 ]] && [[ $window_visible = 0 ]]; then osascript -e 'tell application "Terminal" to set visible  of last  window to true'; window_visible=1; fi }
+#WINDOW_OFF(){ if [[ $window_minimizable = 1 ]] && [[ $window_visible = 1 ]]; then  osascript -e 'tell application "Terminal" to set miniaturized of front window to true'; window_visible=0; fi }
+WINDOW_ON(){ if [[ $window_minimizable = 1 ]] && [[ $window_visible = 0 ]]; then osascript -e 'tell application "Terminal" to set visible  of last  window to true'; window_visible=1; fi }
+WINDOW_OFF(){ if [[ $window_minimizable = 1 ]] && [[ $window_visible = 1 ]]; then  osascript -e 'tell application "Terminal" to set visible of front window to false'; window_visible=0; fi }
 
-SET_INPUT
+
+###################### main ##############################################################################################
 
 clear
 
@@ -506,11 +615,11 @@ osascript -e "tell application \"Terminal\" to set background color of window 1 
 osascript -e "tell application \"Terminal\" to set normal text color of window 1 to {65535, 65535, 65535}"
 
 
-clear && printf '\e[8;22;100t' && printf '\e[3J' && printf "\033[H"
+clear && printf '\e[8;22;74t' && printf '\e[3J' && printf "\033[H"
 loc=`defaults read -g AppleLocale | cut -d "_" -f1`
 MyTTY=`tty | tr -d " dev/\n"`
 term=`ps`;  MyTTYcount=`echo $term | grep -Eo $MyTTY | wc -l | tr - " \t\n"`
-wait_on_exit=0
+wait_on_exit=0; window_visible=1; window_minimizable=1
 printf "\033[?25l"
 macos=$(sw_vers -productVersion | cut -f1-2 -d"." | tr -d '.')
 if [[ "${macos}" = "1015" ]]; then 
@@ -531,28 +640,30 @@ if [[ ! -f ~/Library/Application\ Support/KextSLEinstaller/InstalledKext.plist ]
 fi
 
 
-if [[ ! -d  /Library/Extensions ]]; then 
+if [[ ! -d  /System/Library/Extensions ]]; then 
     if ! GET_PASSWORD; then EXIT_PROGRAM; fi
     echo $mypassword | sudo -S printf '' >/dev/null 2>/dev/null
-    sudo mkdir /Library/Extensions
-    sudo chown -R root:wheel /Library/Extensions
-    sudo chmod -R 755 /Library/Extensions
+    sudo mkdir /System/Library/Extensions
+    sudo chown -R root:wheel /System/Library/Extensions
+    sudo chmod -R 755 /System/Library/Extensions
 fi
 
 UPDATE_CACHE
 
+SET_INPUT
+
+if [[ $log_mode = 1 ]]; then osascript -e 'tell application "Terminal" to set visible of front window to false'; fi
 
 ################ get args string ##########################################################
+
 if [[ ! -f ~/.spatches.txt ]]; then 
+ 
 
     var1=0; while [[ $var1 = 0 ]]; do
 
-
-    GET_INSTALLED_STRING
-    if [[ ! $strng = "" ]]; then 
+    WINDOW_OFF
 
              GET_APP_ICON
-
 
                                 if [[ $loc = "ru" ]]; then
              if answer=$(osascript -e 'display dialog "Что собираемся предпринять?" '"${icon_string}"' buttons {"Удаление", "Установка", "Выход" } default button "Установка" '); then cancel=0; else cancel=1; fi 2>/dev/null
@@ -562,23 +673,20 @@ if [[ ! -f ~/.spatches.txt ]]; then
              if [[ "$(echo $answer | cut -f2 -d':')" = "Exit" ]]; then EXIT_PROGRAM; fi
                                 fi
              if [[ $cancel = 1 ]]; then EXIT_PROGRAM; fi
-             
-    else
-            if [[ $loc = "ru" ]]; then answer="Установка"; else answer="Install"; fi
-    fi
-    if [[ $loc = "ru" ]]; then check_answer="Установка"; else check_answer="Install"; fi
- if [[ "$(echo $answer | cut -f2 -d':')" = "${check_answer}" ]]; then
-    n=4
-            if [[ $loc = "ru" ]]; then
-        printf '\033['${n}';0f''\e[1;33m     Выберите кексты для установки !    \e[0m '
-            else
-        printf '\033['${n}';0f''\e[1;33m     Select the kexts to install  !    \e[0m '
-            fi
+        
+             answer=$(echo "${answer}"  | cut -f2 -d':' )
+            
+if [[ "${answer}" = "Install" ]] || [[ "${answer}" = "Установка" ]]; then
+       
+
     sleep 0.3
     open -W AskKexts.app
+
     clear && printf '\e[3J' && printf "\033[H"
-    if [[ ! -f ~/.spatches.txt ]]; then  UPDATE_CACHE; strng=`echo "$KextLEconf" | grep -A 1 "<key>Installed</key>" | grep string | sed -e 's/.*>\(.*\)<.*/\1/' | tr -d '\n'`; if [[ $strng = "" ]]; then wait_on_exit=0; break; fi
-        else
+    if [[ -f ~/.spatches.txt ]]; then  
+
+    WINDOW_ON
+
         no_kexts=0
 
         GET_ARGS
@@ -588,46 +696,43 @@ if [[ ! -f ~/.spatches.txt ]]; then
                     no_kexts=1
                  else 
                     if ! GET_PASSWORD; then EXIT_PROGRAM; fi
-                    if [[ $path_count -gt 5 ]]; then let lines="path_count*2+12"; clear && printf '\e[8;'$lines';100t' && printf '\e[3J' && printf "\033[H"; fi 
                     update_cache=0
                     INSTALL_KEXTS
                     if [[ $update_cache = 0 ]]; then no_kexts=1; else UPDATE_KERNEL_CACHE; fi
                  fi                                  
         if [[ ${no_kexts} = 1 ]]; then 
+            clear && printf '\e[8;22;74t' && printf '\e[3J' && printf "\033[H"
                     if [[ $loc = "ru" ]]; then
+            n=4
             printf '\033['${n}';0f''\e[1;33m     Не получены подходящие файлы для установки !    \e[0m '
                     else
             printf '\033['${n}';0f''\e[1;33m     No valid files to install found  !              \e[0m '
                     fi
-            read -n 1 -s -t 3
+            SLEEP_READ 3
         fi             
     fi
     
  else
-
-    if [[ ! $strng = "" ]]; then  IFS=';'; kmlist=( ${strng} ); unset IFS; kmcount=${#kmlist[@]}; file_list=""
-
-       for ((i=0;i<$kmcount;i++)) do old_kext="${kmlist[i]}"; file_list+='"'${old_kext}'"' ; if [[ ! $i = $(( $kmcount-1 )) ]]; then file_list+=","; fi ; done
     
-       if result=$(ASK_KEXTS_TO_DELETE); then 
-           if [[ ! $result = "false" ]]; then 
-           if ! GET_PASSWORD; then EXIT_PROGRAM; fi
-           echo $mypassword | sudo -S printf '' >/dev/null 2>/dev/null
-           IFS=","; tmlist=( ${result} ); unset IFS; tmcount=${#tmlist[@]}
-           if [[ $tmcount -gt 5 ]]; then let lines="tmcount*2+12"; clear && printf '\e[8;'$lines';100t' && printf '\e[3J' && printf "\033[H"; fi
-           osascript -e 'tell application "Terminal" to activate'
-           CREATE_TIMESTAMP
-           n=0; corr=0 
-           for ((i=0;i<$kmcount;i++)) do
-           old_kext="${kmlist[i]}"
-           for ((l=0;l<$tmcount;l++)) do if [[ "${old_kext}" = $(echo "${tmlist[l]}" | xargs) ]]; then  kext_name=$(echo "${kmlist[i]}" | xargs);  DELETE_KEXT; break; fi ; done
-           done
-           UPDATE_KERNEL_CACHE
-           fi
-        fi
+    var3=0 
+    while [[ $var3 = 0 ]]; do 
+
+    GET_INSTALLED_STRING
+
+    if [[ ! $strng = "" ]]; then  ASK_TO_DELETE_FROM
+
+        if [[ $cancel = 2 ]]; then break; fi
+        if [[ $cancel = 0 ]]; then  WINDOW_ON; DELETE_KEXTS ; break; fi
+
+    else
+
+         ASK_FOLDER_TO_DELETE
+         if [[ $strng = "" ]] && [[ $cancel = 1 ]]; then break; fi
+         if [[ $cancel = 0 ]]; then WINDOW_ON; DELETE_KEXTS; break; fi
     fi
+    done
  fi
-    clear && printf '\e[8;22;100t' && printf '\e[3J' && printf "\033[H"
+    clear && printf '\e[8;22;74t' && printf '\e[3J' && printf "\033[H"
     done
 fi
 
@@ -646,8 +751,6 @@ TRAIL_FOLDER
 ############################################################################################
 
 if ! GET_PASSWORD; then EXIT_PROGRAM; fi
-
-if [[ $path_count -gt 5 ]]; then let lines="path_count*2+12"; clear && printf '\e[8;'$lines';100t' && printf '\e[3J' && printf "\033[H"; fi
 
 update_cache=0
 

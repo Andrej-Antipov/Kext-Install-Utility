@@ -1,42 +1,5 @@
 #!/bin/bash
 
-
-
-deb=0
-
-DEBUG(){
-if [[ ! $deb = 0 ]]; then
-printf '\n\n Останов '"$stop"'  :\n\n' >> ~/temp.txt 
-printf '............................................................\n' >> ~/temp.txt
-#echo "patches.txt = " >> ~/temp.txt
-#cat ~/.spatches.txt >> ~/temp.txt
-#echo " " >> ~/temp.txt
-echo "answer = ""${answer}" >> ~/temp.txt
-#echo "kmlist = ""${kmlist[@]}" >> ~/temp.txt
-#echo "kmlist/i = ""${kmlist[i]}" >> ~/temp.txt
-#echo "i = ""${i}" >> ~/temp.txt
-#echo " " >> ~/temp.txt
-#echo "new_path = ""${new_path}" >> ~/temp.txt
-#echo " " >> ~/temp.txt
-#echo "kext_path = ""${kext_path}" >> ~/temp.txt
-echo "cancel = ""${cancel}" >> ~/temp.txt
-#echo " " >> ~/temp.txt
-echo "result = ""${result}" >> ~/temp.txt
-#echo "tmlist/l/ = ""${tmlist[l]}" >> ~/temp.txt
-#echo " " >> ~/temp.txt
-#echo "m = ""${m}" >> ~/temp.txt
-#echo "l = ""${l}" >> ~/temp.txt
-#echo "tmlist = ""${tmlist[@]}" >> ~/temp.txt
-#echo "tmcount= ""${tmcount}" >> ~/temp.txt
-#echo "strng = ""$strng" >> ~/temp.txt
-#echo "folder_trailed_count = "${#folder_trailed[@]} >> ~/temp.txt
-
-printf '............................................................\n\n' >> ~/temp.txt
-sleep 0.2
-read -n 1 -s
-fi
-}
-
 UPDATE_CACHE(){
 if [[ -f ~/Library/Application\ Support/KextLEinstaller/InstalledKext.plist ]]; then KextLEconf=$( cat ~/Library/Application\ Support/KextLEinstaller/InstalledKext.plist ); cache=1
 else
@@ -325,7 +288,8 @@ fi
 BACKUP_EXTENSION(){
 if [[ -d /Library/Extensions/"${new_kext}" ]]; then
 if [[ ! -d ~/Desktop/"Replaced Extensions"/"Library Extensions"/"${TIME_STAMP}" ]]; then mkdir -p ~/Desktop/"Replaced Extensions"/"Library Extensions"/"${TIME_STAMP}"; fi
-if [[ ! -d ~/Desktop/"Replaced Extensions"/"Library Extensions"/"${TIME_STAMP}"/"${new_kext}" ]]; then cp -a /Library/Extensions/"${new_kext}" ~/Desktop/"Replaced Extensions"/"Library Extensions"/"${TIME_STAMP}"; fi
+if [[ ! -d ~/Desktop/"Replaced Extensions"/"Library Extensions"/"${TIME_STAMP}"/"${new_kext}" ]]; then 
+         rsync -avq /Library/Extensions/"${new_kext}" ~/Desktop/"Replaced Extensions"/"Library Extensions"/"${TIME_STAMP}"; fi ; 2>&-
 fi
 }
 
@@ -344,19 +308,24 @@ sleep 0.4
 ProgressBar ${number} ${_end}
 done
 }
-
 GET_KEXT_INFO(){
-sver="${new_path}"
-sver="$(plutil -p "${sver}"/Contents/Info.plist | grep CFBundleShortVersionString | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
+sver="$(plutil -p "${new_path}"/Contents/Info.plist | grep CFBundleShortVersionString | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
+if [[ $sver = "" ]]; then 
+sver="$(plutil -p "${new_path}"/Info.plist | grep CFBundleShortVersionString | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
+fi
 old_ver=""
 old_ver="$(plutil -p /Library/Extensions/"${new_kext}"/Contents/Info.plist | grep CFBundleShortVersionString  | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
+if [[ $old_ver = "" ]]; then
+old_ver="$(plutil -p /Library/Extensions/"${new_kext}"/Info.plist | grep CFBundleShortVersionString  | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
+fi
 }
 
 UPDATE_KERNEL_CACHE(){
 osascript -e 'tell application "Terminal" to activate'
 SET_INPUT
-if [[ $large_window = 1 ]]; then sz=100; else sz=74; fi
-if [[ $path_count -gt 5 ]]; then let lines="path_count*2+12"; clear && printf '\e[8;'$lines';'$sz't' && printf '\e[3J' && printf "\033[H"; fi
+if [[ $path_count -gt 5 ]]; then let lines="path_count*2+12"; else lines=22; fi
+if [[ $large_window = 1 ]]; then sz=100; else sz=74; fi 
+clear && printf '\e[8;'$lines';'$sz't' && printf '\e[3J' && printf "\033[H"
 echo ${vbuf}
 echo
 echo
@@ -455,15 +424,16 @@ new_path="$(echo "${all_path[l]}" | xargs)"; new_kext=$(echo "${new_path}" | sed
    if [[ ! -f "${new_path}" ]]; then 
      if [[ ! "${new_path}" = "/Library/Extensions" ]] &&  [[ ! "$( echo "${new_path}" | sed 's/[^/]*$//' )" = "/Library/Extensions/" ]];  then
       if [[ -d "${new_path}" ]]; then 
-        if [[ -f "${new_path}"/Contents/Info.plist ]]; then all_path_trailed+=( "$(echo "${all_path[l]}" | xargs)" )
+        if [[ -f "${new_path}"/Contents/Info.plist ]] || [[ -f "${new_path}"/Info.plist && ( "${new_kext##*.}" = "kext" || "${new_kext##*.}" = "plugin" ) || "${new_kext##*.}" = "bundle" ]]; then all_path_trailed+=( "$(echo "${all_path[l]}" | xargs)" )
             else
                 get_args="$( find "${new_path}" -maxdepth 1 -type d -not -path "${new_path}" | tr '\n' ';' | xargs )"
                 folder_trailed=(); var=0; m=1; while [[ $var = 0 ]]; do str="$(echo $get_args | cut -f"${m}" -d ';')"; if [[ ! $str = "" ]]; then folder_trailed+=( "${str}" ); let "m++"; else break; fi; done
                 folder_trailed_count=${#folder_trailed[@]}
                 if [[ ! $folder_trailed_count = 0 ]]; then 
                     for ((i=0;i<$folder_trailed_count;i++)) do 
+                    trailed_kext=$(echo "$(echo "${folder_trailed[i]}" | xargs)" | sed 's|.*/||')
                     if [[ ! -f "$(echo "${folder_trailed[i]}" | xargs)" ]]; then
-                        if [[ -f "$(echo "${folder_trailed[i]}" | xargs)"/Contents/Info.plist ]]; then  all_path_trailed+=( "$(echo "${folder_trailed[i]}" | xargs)" ); fi
+                        if [[ -f "$(echo "${folder_trailed[i]}" | xargs)"/Contents/Info.plist ]] || [[ -f "$(echo "${folder_trailed[i]}" | xargs)"/Info.plist && ( "${trailed_kext##*.}" = "kext" || "${trailed_kext##*.}" = "plugin" ) || "${trailed_kext##*.}" = "bundle" ]]; then  all_path_trailed+=( "$(echo "${folder_trailed[i]}" | xargs)" ); fi
                     fi
                     done
                 fi
@@ -525,7 +495,7 @@ ASK_TO_DELETE_FROM(){
                 if [[ $loc = "ru" ]]; then
              if answer=$(osascript -e 'display dialog "Выбрать файлы из /Library/Extensions или из списка ранее установленных?" '"${icon_string}"' buttons {"Удаление из системной папки", "Удаление через список", "Отмена" } default button "Удаление через список" '); then cancel=0; else cancel=1; fi 2>/dev/null
                                 else
-             if answer=$(osascript -e 'display dialog "Select files from / Library / Extensions or from a list of previously installed ones?" '"${icon_string}"' buttons {"Choose from the system folder", "Choose from the list", "Cancel" } default button "Choose from the list" '); then cancel=0; else cancel=2; fi 2>/dev/null
+             if answer=$(osascript -e 'display dialog "Select files from /Library/Extensions or from a list of previously installed ones?" '"${icon_string}"' buttons {"Choose from the system folder", "Choose from the list", "Cancel" } default button "Choose from the list" '); then cancel=0; else cancel=2; fi 2>/dev/null
                                 fi
             if [[ $cancel = 2 ]]; then answer="Cancel"; else answer=$(echo "${answer}"  | cut -f2 -d':' ); fi
 
@@ -549,7 +519,7 @@ DELETE_KEXTS(){
            IFS=","; tmlist=( ${result} ); unset IFS; tmcount=${#tmlist[@]}
            osascript -e 'tell application "Terminal" to activate'
            CREATE_TIMESTAMP
-           n=0; corr=0 ; vbuf=""
+           n=0; corr=0 ; large_window=0; vbuf=""
             if [[ $loc = "ru" ]]; then
             printf '\r\n\e[1;36m               Удаление расширений: \e[1;32m'
             else
