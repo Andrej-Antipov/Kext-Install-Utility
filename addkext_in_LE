@@ -16,14 +16,14 @@ if [[ $loc = "ru" ]]; then
 osascript <<EOD
 tell application "System Events"    activate
 set ThemeList to {$file_list}
-set FavoriteThemeAnswer to choose from list ThemeList with title "Удалить установленные файлы"  with prompt "Выберите один или несколько файлов"  default items "Basic" with multiple selections allowed #set FavoriteThemeAnswer to FavoriteThemeAnswer's item 1 (* extract choice from list *)
+set FavoriteThemeAnswer to choose from list ThemeList with title "Удалить установленные файлы"  with prompt "Выберите один или несколько файлов"  default items "Basic" with multiple selections allowed 
 end tell
 EOD
 else
 osascript <<EOD
 tell application "System Events"    activate
 set ThemeList to {$file_list}
-set FavoriteThemeAnswer to choose from list ThemeList with title "Delete installed files" with prompt "Select one or more files" default items "Basic" with multiple selections allowed#set FavoriteThemeAnswer to FavoriteThemeAnswer's item 1 (* extract choice from list *)
+set FavoriteThemeAnswer to choose from list ThemeList with title "Delete installed files" with prompt "Select one or more files" default items "Basic" with multiple selections allowed
 end tell
 EOD
 fi
@@ -249,7 +249,7 @@ extension="${new_kext##*.}"
 
 let "n++"; let "n++"
 
-if [[ ${extension} = "kext" ]] || [[ ${extension} = "bundle" ]] || [[ ${extension} = "plugin" ]]; then 
+if [[ ${extension} = "kext" ]] || [[ ${extension} = "bundle" ]] || [[ ${extension} = "plugin" ]] || [[ ${extension} = "ppp" ]]; then 
     update_cache=1
     if [[ $loc = "ru" ]]; then
     vbuf+=$( printf '\033['${n}';7f''     Установлен:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m' )

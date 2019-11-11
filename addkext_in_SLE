@@ -249,7 +249,7 @@ extension="${new_kext##*.}"
 
 let "n++"; let "n++"
 
-if [[ ${extension} = "kext" ]] || [[ ${extension} = "bundle" ]] || [[ ${extension} = "plugin" ]]; then 
+if [[ ${extension} = "kext" ]] || [[ ${extension} = "bundle" ]] || [[ ${extension} = "plugin" ]] || [[ ${extension} = "ppp" ]]; then 
     update_cache=1
     if [[ $loc = "ru" ]]; then
     vbuf+=$( printf '\033['${n}';7f''     Установлен:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m' )
