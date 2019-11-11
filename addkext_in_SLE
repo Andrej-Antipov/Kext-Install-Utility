@@ -425,7 +425,7 @@ new_path="$(echo "${all_path[l]}" | xargs)"; new_kext=$(echo "${new_path}" | sed
    if [[ ! -f "${new_path}" ]]; then 
      if [[ ! "${new_path}" = "/System/Library/Extensions" ]] &&  [[ ! "$( echo "${new_path}" | sed 's/[^/]*$//' )" = "/System/Library/Extensions/" ]];  then
       if [[ -d "${new_path}" ]]; then 
-        if [[ -f "${new_path}"/Contents/Info.plist ]] || [[ -f "${new_path}"/Info.plist && ( "${new_kext##*.}" = "kext" || "${new_kext##*.}" = "plugin" ) || "${new_kext##*.}" = "bundle" ]]; then all_path_trailed+=( "$(echo "${all_path[l]}" | xargs)" )
+        if [[ -f "${new_path}"/Contents/Info.plist ]] || [[ -f "${new_path}"/Info.plist && "${new_kext##*.}" = "kext" ]]; then all_path_trailed+=( "$(echo "${all_path[l]}" | xargs)" )
             else
                 get_args="$( find "${new_path}" -maxdepth 1 -type d -not -path "${new_path}" | tr '\n' ';' | xargs )"
                 folder_trailed=(); var=0; m=1; while [[ $var = 0 ]]; do str="$(echo $get_args | cut -f"${m}" -d ';')"; if [[ ! $str = "" ]]; then folder_trailed+=( "${str}" ); let "m++"; else break; fi; done
@@ -434,7 +434,7 @@ new_path="$(echo "${all_path[l]}" | xargs)"; new_kext=$(echo "${new_path}" | sed
                     for ((i=0;i<$folder_trailed_count;i++)) do 
                     trailed_kext=$(echo "$(echo "${folder_trailed[i]}" | xargs)" | sed 's|.*/||')
                     if [[ ! -f "$(echo "${folder_trailed[i]}" | xargs)" ]]; then
-                        if [[ -f "$(echo "${folder_trailed[i]}" | xargs)"/Contents/Info.plist ]] || [[ -f "$(echo "${folder_trailed[i]}" | xargs)"/Info.plist && ( "${trailed_kext##*.}" = "kext" || "${trailed_kext##*.}" = "plugin" ) || "${trailed_kext##*.}" = "bundle" ]]; then  all_path_trailed+=( "$(echo "${folder_trailed[i]}" | xargs)" ); fi
+                        if [[ -f "$(echo "${folder_trailed[i]}" | xargs)"/Contents/Info.plist ]] || [[ -f "$(echo "${folder_trailed[i]}" | xargs)"/Info.plist && "${trailed_kext##*.}" = "kext" ]]; then  all_path_trailed+=( "$(echo "${folder_trailed[i]}" | xargs)" ); fi
                     fi
                     done
                 fi
