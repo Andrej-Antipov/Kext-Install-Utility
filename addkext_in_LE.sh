@@ -1,5 +1,42 @@
 #!/bin/bash
 
+
+
+deb=0
+
+DEBUG(){
+if [[ ! $deb = 0 ]]; then
+printf '\n\n Останов '"$stop"'  :\n\n' >> ~/temp.txt 
+printf '............................................................\n' >> ~/temp.txt
+#echo "patches.txt = " >> ~/temp.txt
+#cat ~/.spatches.txt >> ~/temp.txt
+#echo " " >> ~/temp.txt
+echo "answer = ""${answer}" >> ~/temp.txt
+#echo "kmlist = ""${kmlist[@]}" >> ~/temp.txt
+#echo "kmlist/i = ""${kmlist[i]}" >> ~/temp.txt
+#echo "i = ""${i}" >> ~/temp.txt
+#echo " " >> ~/temp.txt
+#echo "new_path = ""${new_path}" >> ~/temp.txt
+#echo " " >> ~/temp.txt
+#echo "kext_path = ""${kext_path}" >> ~/temp.txt
+echo "cancel = ""${cancel}" >> ~/temp.txt
+#echo " " >> ~/temp.txt
+echo "result = ""${result}" >> ~/temp.txt
+#echo "tmlist/l/ = ""${tmlist[l]}" >> ~/temp.txt
+#echo " " >> ~/temp.txt
+#echo "m = ""${m}" >> ~/temp.txt
+#echo "l = ""${l}" >> ~/temp.txt
+#echo "tmlist = ""${tmlist[@]}" >> ~/temp.txt
+#echo "tmcount= ""${tmcount}" >> ~/temp.txt
+#echo "strng = ""$strng" >> ~/temp.txt
+#echo "folder_trailed_count = "${#folder_trailed[@]} >> ~/temp.txt
+
+printf '............................................................\n\n' >> ~/temp.txt
+sleep 0.2
+read -n 1 -s
+fi
+}
+
 UPDATE_CACHE(){
 if [[ -f ~/Library/Application\ Support/KextLEinstaller/InstalledKext.plist ]]; then KextLEconf=$( cat ~/Library/Application\ Support/KextLEinstaller/InstalledKext.plist ); cache=1
 else
@@ -375,13 +412,19 @@ printf '\e[0m\r''                                                               
 fi
 printf '\r                                \n'
 printf '\r\033[6A'
+if [[ $sz = 74 ]]; then
 printf "%"74"s"'\n'"%"74"s"'\n'"%"74"s"'\n'"%"74"s"'\n'
+else
+printf "%"100"s"'\n'"%"100"s"'\n'"%"100"s"'\n'"%"100"s"'\n'
+fi
 if [[ $wait_on_exit = 1 ]]; then  
 osascript -e 'tell application "Terminal" to activate'
-if [[ $loc = "ru" ]]; then
-                printf '\n                                 Нажмите любую клавишу  '
+                    if [[ $loc = "ru" ]]; then
+                if [[ $sz = 100 ]]; then cor=39; else cor=26; fi
+                printf '\n\n\r\033['$cor'CНажмите любую клавишу               '
                     else
-                printf '\n                                     Press any key  '
+                if [[ $sz = 100 ]]; then cor=43; else cor=30; fi
+                printf '\n\n\r\033['$cor'CPress any key                       '
                     fi
 ANY_KEY
 
@@ -482,20 +525,21 @@ ASK_TO_DELETE_FROM(){
                 if [[ $loc = "ru" ]]; then
              if answer=$(osascript -e 'display dialog "Выбрать файлы из /Library/Extensions или из списка ранее установленных?" '"${icon_string}"' buttons {"Удаление из системной папки", "Удаление через список", "Отмена" } default button "Удаление через список" '); then cancel=0; else cancel=1; fi 2>/dev/null
                                 else
-             if answer=$(osascript -e 'display dialog "Select files from / Library / Extensions or from a list of previously installed ones?" '"${icon_string}"' buttons {"Choose from the system folder", "Choose from the list", "Cancel" } default button "Choose from the list" '); then cancel=0; else cancel=1; fi 2>/dev/null
+             if answer=$(osascript -e 'display dialog "Select files from / Library / Extensions or from a list of previously installed ones?" '"${icon_string}"' buttons {"Choose from the system folder", "Choose from the list", "Cancel" } default button "Choose from the list" '); then cancel=0; else cancel=2; fi 2>/dev/null
                                 fi
-        
-             answer=$(echo "${answer}"  | cut -f2 -d':' )
+            if [[ $cancel = 2 ]]; then answer="Cancel"; else answer=$(echo "${answer}"  | cut -f2 -d':' ); fi
 
-            if [[ "${answer}" = "Удаление из системной папки" ]] || [[ "${answer}" = "Choose from the system folder" ]]; then ASK_FOLDER_TO_DELETE
-                        elif [[ "${answer}" = "Удаление через список" ]] || [[ "${answer}" = "Choose from the list" ]]; then
-                    from_list=1
-                    if result=$(ASK_KEXTS_TO_DELETE); then cancel=0; else cancel=1; fi
-                    if [[ $result = "false" ]]; then cancel=1; else cancel=0; fi
-                        elif [[ "${answer}" = "Отмена" ]] || [[ "${answer}" = "Сancel" ]]; then cancel=2
-             else
-                    cancel=1
-             fi
+                    case "$answer" in
+
+            "Удаление из системной папки"   ) ASK_FOLDER_TO_DELETE ;;
+            "Choose from the system folder" ) ASK_FOLDER_TO_DELETE ;;
+            "Удаление через список"         ) rom_list=1; if result=$(ASK_KEXTS_TO_DELETE); then cancel=0; else cancel=1; fi ; if [[ $result = "false" ]]; then cancel=1; else cancel=0; fi ;;
+            "Choose from the list"          ) rom_list=1; if result=$(ASK_KEXTS_TO_DELETE); then cancel=0; else cancel=1; fi ; if [[ $result = "false" ]]; then cancel=1; else cancel=0; fi ;;
+            "Отмена"                        ) cancel=2 ;;
+            "Cancel"                        ) cancel=2 ;;
+                                           *) cancel=1 ;;
+                    esac
+            
 }
 
 
@@ -506,6 +550,15 @@ DELETE_KEXTS(){
            osascript -e 'tell application "Terminal" to activate'
            CREATE_TIMESTAMP
            n=0; corr=0 ; vbuf=""
+            if [[ $loc = "ru" ]]; then
+            printf '\r\n\e[1;36m               Удаление расширений: \e[1;32m'
+            else
+            printf '\r\n\e[1;36m           Deleting the extensions: \e[1;32m'
+            fi
+            printf "\r\033[18C"
+            spin="/|\\-/|\\-"; i=0
+            while :; do for i in `seq 0 7`;  do printf '\r\033[38C\e[1;32m'"${spin:$i:1}"; echo -en "\010\033[0m";  sleep 0.05; done; done &
+            trap "kill $!" EXIT
         if [[ $from_list = 1 ]]; then 
            for ((i=0;i<$kmcount;i++)) do
            old_kext="${kmlist[i]}"
@@ -514,6 +567,10 @@ DELETE_KEXTS(){
         else
            for ((l=0;l<$tmcount;l++)) do kext_name=$(echo "${tmlist[l]}" | xargs); DELETE_KEXT;  done
         fi
+            kill $!
+            wait $! 2>/dev/null
+            trap " " EXIT
+            printf '\e[0m\r''                                                                       \n\n'
            path_count=$tmcount
            if [[ $not_found = 0 ]]; then UPDATE_KERNEL_CACHE ; else SLEEP_READ 3 ; fi
 
@@ -567,11 +624,13 @@ printf '\r                                                                      
  printf "\r\n\033[3A\033[46C" ; if [[ $order = 3 ]]; then printf "\033[3C"; fi   fi
 
 fi
+
 }
 
+#WINDOW_ON(){ if [[ $window_minimizable = 1 ]] && [[ $window_visible = 0 ]]; then osascript -e 'tell application "Terminal" to set visible  of last  window to true'; window_visible=1; fi }
+#WINDOW_OFF(){ if [[ $window_minimizable = 1 ]] && [[ $window_visible = 1 ]]; then  osascript -e 'tell application "Terminal" to set miniaturized of front window to true'; window_visible=0; fi }
 WINDOW_ON(){ if [[ $window_minimizable = 1 ]] && [[ $window_visible = 0 ]]; then osascript -e 'tell application "Terminal" to set visible  of last  window to true'; window_visible=1; fi }
-
-WINDOW_OFF(){ if [[ $window_minimizable = 1 ]] && [[ $window_visible = 1 ]]; then  osascript -e 'tell application "Terminal" to set miniaturized of front window to true'; window_visible=0; fi }
+WINDOW_OFF(){ if [[ $window_minimizable = 1 ]] && [[ $window_visible = 1 ]]; then  osascript -e 'tell application "Terminal" to set visible of front window to false'; window_visible=0; fi }
 
 
 ###################### main ##############################################################################################
@@ -589,9 +648,7 @@ clear && printf '\e[8;22;74t' && printf '\e[3J' && printf "\033[H"
 loc=`defaults read -g AppleLocale | cut -d "_" -f1`
 MyTTY=`tty | tr -d " dev/\n"`
 term=`ps`;  MyTTYcount=`echo $term | grep -Eo $MyTTY | wc -l | tr - " \t\n"`
-wait_on_exit=0
-window_visible=1
-window_minimizable=1
+wait_on_exit=0; window_visible=1; window_minimizable=1
 printf "\033[?25l"
 macos=$(sw_vers -productVersion | cut -f1-2 -d"." | tr -d '.')
 if [[ "${macos}" = "1015" ]]; then 
@@ -623,6 +680,8 @@ fi
 UPDATE_CACHE
 
 SET_INPUT
+
+if [[ $log_mode = 1 ]]; then osascript -e 'tell application "Terminal" to set visible of front window to false'; fi
 
 ################ get args string ##########################################################
 
