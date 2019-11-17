@@ -361,7 +361,7 @@ fi
 echo
 echo
 text_edit_flag=0
-if [[ -f ~/Desktop/KernelCacheUpdate.log.txt ]]; then log=$(cat /Users/andrej/Desktop/KernelCacheUpdate.log.txt); if [[ ! $log = "" ]]; then
+if [[ -f ~/Desktop/KernelCacheUpdate.log.txt ]]; then log=$(cat ~/Desktop/KernelCacheUpdate.log.txt); if [[ ! $log = "" ]]; then
 textedit_flag=1; open -a "TextEdit" -n  ~/Desktop/KernelCacheUpdate.log.txt; osascript -e 'tell application "Terminal" to activate'; fi
 fi
 if [[ $loc = "ru" ]]; then
