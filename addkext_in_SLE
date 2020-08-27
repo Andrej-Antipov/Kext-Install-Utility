@@ -111,7 +111,7 @@ if (security find-generic-password -a ${USER} -s addkextinle -w) >/dev/null 2>&1
                     PASSWORD=""
                         
                         if [[ $loc = "ru" ]]; then
-                        SUBTITLE=SUBTITLE="НЕВЕРНЫЙ ПАРОЛЬ УДАЛЁН ИЗ КЛЮЧЕЙ !"; MESSAGE=" "
+                        SUBTITLE="НЕВЕРНЫЙ ПАРОЛЬ УДАЛЁН ИЗ КЛЮЧЕЙ !"; MESSAGE=" "
                         else
                         SUBTITLE="WRONG PASSWORD REMOVED FROM KEYCHAIN !"; MESSAGE=" "
                         fi
@@ -130,7 +130,7 @@ if [[ $PASSWORD = "" ]]; then
                         EXIT_PROGRAM
  fi
 
-echo $PASSWORD | sudo -S printf '' 2>/dev/null
+echo "$PASSWORD" | sudo -S printf '' 2>/dev/null
 
 }
 
@@ -139,10 +139,10 @@ ENTER_PASSWORD(){
         TRY=3; GET_APP_ICON
         while [[ ! $TRY = 0 ]]; do
         if [[ $loc = "ru" ]]; then
-        if PASSWORD=$(osascript -e 'Tell application "System Events" to display dialog "       Введите пароль: " '"${icon_string}"' with hidden answer  default answer ""'  -e 'text returned of result'); then cansel=0; else cansel=1; fi 2>/dev/null
+        if PASSWORD="$(osascript -e 'Tell application "System Events" to display dialog "Для управления системными расширениями нужен пароль!\nОн будет храниться в вашей связке ключей\n\nПользователь:  '"$(id -F)"'\nВведите ваш пароль:" '"${icon_string}"' giving up after (110) with hidden answer  default answer ""' -e 'text returned of result')"; then cansel=0; else cansel=1; fi 2>/dev/null
         else
-        if PASSWORD=$(osascript -e 'Tell application "System Events" to display dialog "       Enter password: " '"${icon_string}"' with hidden answer  default answer ""' -e 'text returned of result'); then cansel=0; else cansel=1; fi 2>/dev/null
-        fi      
+        if PASSWORD="$(osascript -e 'Tell application "System Events" to display dialog "Password is required to manage kernel extensions!\nIt will be keeped in your keychain\n\nUser Name:  '"$(id -F)"'\nEnter your password:" '"${icon_string}"' giving up after (110) with hidden answer  default answer ""' -e 'text returned of result')"; then cansel=0; else cansel=1; fi 2>/dev/null
+        fi        
                 if [[ $cansel = 1 ]]; then break; fi  
                 if [[ $PASSWORD = "" ]]; then PASSWORD="?"; fi
 
@@ -180,9 +180,9 @@ fi
             if [[ "$PASSWORD" = "0" ]]; then
                 
                     if [[ $loc = "ru" ]]; then
-                SUBTITLE="ПАРОЛЬ НЕ ПОЛУЧЕН !"; MESSAGE=""
+                SUBTITLE="ПАРОЛЬ НЕ ПОЛУЧЕН !"; MESSAGE="Продолжение невозможно. Конец программы."
                     else
-                SUBTITLE="PASSWORD NOT KEEPED IN KEYCHAIN !"; MESSAGE=""
+                SUBTITLE="PASSWORD NOT KEEPED IN KEYCHAIN !"; MESSAGE="Exiting the program...."
                     fi
                 DISPLAY_NOTIFICATION
             fi
@@ -217,10 +217,77 @@ fi
 
 }
 
+ERROR_NO_VALID_FILES(){
+                        if [[ $loc = "ru" ]]; then
+                        SUBTITLE="НЕ ВЫБРАНЫ ВАЛИДНЫЕ ТИПЫ ФАЙЛОВ !"; MESSAGE=""
+                        else
+                        SUBTITLE="NO VALID FILE TYPES WAS CHHOSEN!"; MESSAGE=""
+                        fi
+                        DISPLAY_NOTIFICATION
+}
+
+EXIT_SNAPSHOT(){
+                        if [[ $loc = "ru" ]]; then
+                        SUBTITLE="ОШИБКА! СИСТЕМА ЗАГРУЖЕНА СО СНАПШОТА !"; MESSAGE="КОРНЕВОЙ РАЗДЕЛ НЕЛЬЗЯ ПЕРЕМОНТИРОВАТЬ НА ЗАПИСЬ"
+                        else
+                        SUBTITLE="ERROR! THE SYSTEM LOADED FROM SNAPSHOT !"; MESSAGE="IMPOSSIBLE TO REMOUNT ROOT VOLUME FOR WRITE MODE"
+                        fi
+                        DISPLAY_NOTIFICATION
+                        EXIT_PROGRAM
+}
+
+EXIT_REMOUNT(){
+
+
+                        if [[ $loc = "ru" ]]; then
+                        SUBTITLE="ОШИБКА МОНТИРОВАНИЯ КОРНЕВОГО РАЗДЕЛА НА ЗАПИСЬ!"; MESSAGE=""
+                        else
+                        SUBTITLE="ERROR ! REMOUNTING ROOT VOLUME FOR WRITE FAILED"; MESSAGE=""
+                        fi
+                        DISPLAY_NOTIFICATION
+                        EXIT_PROGRAM
+
+}
+
+RESTORE_ORIGINAL(){
+restored=0
+if [[ ${restore_original} = 1 ]]; then
+    if [[ -d ${TARGET}/"${kext_name}.original" ]]; then
+    echo "$PASSWORD" | sudo -S rm -Rf ${TARGET}/"${kext_name}"; update_cache=1 
+    echo "$PASSWORD" | sudo -S mv ${TARGET}/"${kext_name}.original" ${TARGET}/"${kext_name}"
+    restored=1
+    fi
+fi
+}
+
+REMOVE_NONREPLACABLE(){
+if [[ -f ${TARGET}/non_replaced_kexts.txt ]]; then
+  if [[ ! $(cat ${TARGET}/non_replaced_kexts.txt | grep -ow "${kext_name}") = "" ]]; then
+    cat ${TARGET}/non_replaced_kexts.txt | sed -n '/'$kext_name'/!p' | sudo  tee -a ${TARGET}/non_replaced_kexts.txt.back >/dev/null
+    echo "$PASSWORD" | sudo -S rm -f ${TARGET}/non_replaced_kexts.txt;
+    echo "$PASSWORD" | sudo -S mv ${TARGET}/non_replaced_kexts.txt.back ${TARGET}/non_replaced_kexts.txt
+  fi 
+if [[ $( cat ${TARGET}/non_replaced_kexts.txt) = "" ]]; then echo "$PASSWORD" | sudo -S rm -f ${TARGET}/non_replaced_kexts.txt; fi 
+fi 
+}
+
+CHECK_DELETE_KEXT(){
+if [[ ${restored} = 0 ]]; then
+    if [[ ! -d ${TARGET}/"${kext_name}".original ]]; then
+        if [[ -f ${TARGET}/non_replaced_kexts.txt ]] && [[ ! $(cat ${TARGET}/non_replaced_kexts.txt | grep -ow "${kext_name}") = "" ]]; then
+            echo "$PASSWORD" | sudo -S rm -Rf ${TARGET}/"${kext_name}"; update_cache=1
+            REMOVE_NONREPLACABLE
+            else
+            echo "$PASSWORD" | sudo -S mv ${TARGET}/"${kext_name}" ${TARGET}/"${kext_name}".original
+        fi
+    fi
+fi
+}
+
 DELETE_KEXT(){
 
     let "n++"; let "n++"
-if [[ ! -d /System/Library/Extensions/"${kext_name}" ]]; then 
+if [[ ! -d ${TARGET}/"${kext_name}" ]]; then 
     if [[ $loc = "ru" ]]; then
     vbuf+=$( printf '\033['${n}';20f''\e[1;31m     Не найден:    \e[1;33m'"${kext_name}"'\e[0m ' )
     else
@@ -230,17 +297,38 @@ if [[ ! -d /System/Library/Extensions/"${kext_name}" ]]; then
 
 else
     not_found=0
-    if [[ ! /System/Library/Extensions/"${kext_name}" = "/System/Library/Extensions/" ]]; then new_kext="${kext_name}"; BACKUP_EXTENSION; sudo rm -Rf /System/Library/Extensions/"${kext_name}"; update_cache=1; fi
+    if [[ ! ${TARGET}/"${kext_name}" = "${TARGET}/" ]]; then 
+        new_kext="${kext_name}"
+        BACKUP_EXTENSION
+        RESTORE_ORIGINAL
+        CHECK_DELETE_KEXT
+    fi
+    
     if [[ $loc = "ru" ]]; then
-    vbuf+=$( printf '\033['${n}';20f''\e[1;31m     Удалён:    \e[1;33m'"${kext_name}"'\e[0m ' )
+        if [[ $restored = 0 ]]; then
+            vbuf+=$( printf '\033['${n}';20f''\e[1;31m      Удалён:    \e[1;33m'"${kext_name}"'\e[0m ' )
+            else
+            vbuf+=$( printf '\033['${n}';20f''\e[1;35mВосстановлен:    \e[1;33m'"${kext_name}"'\e[0m ' )
+        fi
     else
-    vbuf+=$( printf '\033['${n}';20f''\e[1;31m     Deleted:    \e[1;33m'"${kext_name}"'\e[0m ' )
+        if [[ $restored = 0 ]]; then
+            vbuf+=$( printf '\033['${n}';20f''\e[1;31m      Deleted:    \e[1;33m'"${kext_name}"'\e[0m ' )
+        else
+            vbuf+=$( printf '\033['${n}';20f''\e[1;35m     Restored:    \e[1;33m'"${kext_name}"'\e[0m ' )
+        fi
     fi
 
      DEL_KEXT_IN_PLIST
 
 fi
 
+}
+
+CHECK_BOOT_CANDIDATE(){
+case "${new_kext}" in
+    LegacyUSBInjector.kext   ) BUNDLE_PATH+=" --bundle-path $TARGET/${new_kext} " ;;
+    USBPorts.kext            ) BUNDLE_PATH+=" --bundle-path $TARGET/${new_kext} " ;;
+esac
 }
 
 CHECK_INSTALL_KEXTS(){
@@ -252,21 +340,34 @@ let "n++"; let "n++"
 if [[ ${extension} = "kext" ]] || [[ ${extension} = "bundle" ]] || [[ ${extension} = "plugin" ]] || [[ ${extension} = "ppp" ]]; then 
     update_cache=1
     if [[ $loc = "ru" ]]; then
-    vbuf+=$( printf '\033['${n}';7f''     Установлен:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m' )
+            if [[ $old_ver = "" ]]; then
+                vbuf+=$( printf '\033['${n}';7f''     Установлен:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m' )
+            else
+                vbuf+=$( printf '\033['${n}';7f''\e[1;35m        Заменён:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m' )
+            fi
+            if [[ ! $old_ver = "" ]]; then large_window=1;  vbuf+=$( printf ' -                       была ver. \e[1;31m'$old_ver'\e[0m \n' else printf '\n' ) ; fi        
     else
-    vbuf+=$( printf '\033['${n}';7f''      Installed:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m' )
-    fi
-    if [[ ! $old_ver = "" ]]; then large_window=1;  vbuf+=$( printf ' -      was ver. \e[1;31m'$old_ver'\e[0m \n' else printf '\n' ) ; fi 
-    
-    echo $mypassword | sudo -S printf '' >/dev/null 2>/dev/null
+            if [[ $old_ver = "" ]]; then
+                vbuf+=$( printf '\033['${n}';7f''      Installed:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m' )
+            else
+                vbuf+=$( printf '\033['${n}';7f''\e[1;35m       Replaced:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';68f''\e[0m' )
+            fi
+            if [[ ! $old_ver = "" ]]; then large_window=1;  vbuf+=$( printf ' -                        was ver. \e[1;31m'$old_ver'\e[0m \n' else printf '\n' ) ; fi
+    fi 
+       
+    echo "$PASSWORD" | sudo -S printf '' >/dev/null 2>/dev/null
 
+    CHECK_NONREPLACEABLE
     BACKUP_EXTENSION
 
-    if [[ -d /System/Library/Extensions/"${new_kext}" ]] && [[ ! /System/Library/Extensions/"${new_kext}" = "/System/Library/Extensions/" ]]; then sudo rm -Rf /System/Library/Extensions/"${new_kext}"; fi
-    sudo cp -a "${new_path}" /System/Library/Extensions
-    sudo chown -R root:wheel /System/Library/Extensions/"${new_kext}"
-    sudo chmod  -R 755 /System/Library/Extensions/"${new_kext}"
+    if [[ -d ${TARGET}/"${new_kext}" ]] && [[ ! ${TARGET}/"${new_kext}" = "${TARGET}/" ]]; then 
+    echo "$PASSWORD" | sudo -S rm -Rf ${TARGET}/"${new_kext}"; fi
+    echo "$PASSWORD" | sudo -S cp -a "${new_path}" ${TARGET}
+    echo "$PASSWORD" | sudo -S chown -R root:wheel ${TARGET}/"${new_kext}"
+    echo "$PASSWORD" | sudo -S chmod  -R 755 ${TARGET}/"${new_kext}"
     ADD_KEXT_IN_PLIST
+
+    if [[ "${macos}" = "1016" ]] || [[ "${macos:0:2}" = "11" ]]; then CHECK_BOOT_CANDIDATE; fi
 
     else
     wait_on_exit=1
@@ -285,11 +386,20 @@ if [[ -d ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STA
 fi
 }
 
+CHECK_NONREPLACEABLE(){
+    pushd "${TARGET}" > /dev/null
+    if [[ ! -f non_replaced_kexts.txt ]]; then sudo touch non_replaced_kexts.txt; fi
+    if [[ ! -d "${new_kext}" ]] && [[ $(cat non_replaced_kexts.txt | grep -ow "${new_kext}") = "" ]] && [[ ! -d "${new_kext}.original" ]]; then echo "${new_kext}" | sudo tee -a non_replaced_kexts.txt > /dev/null; fi
+    if [[ -d "${new_kext}" ]] && [[ ! -d "${new_kext}.original" ]] && [[ $(cat non_replaced_kexts.txt | grep -ow "${new_kext}") = "" ]]; then sudo rsync -avq  "${new_kext}/" "${new_kext}.original"; fi
+    if [[ -f non_replaced_kexts.txt ]] && [[ $( cat non_replaced_kexts.txt ) = "" ]]; then echo "$PASSWORD" | sudo -S rm -f non_replaced_kexts.txt; fi
+    popd > /dev/null
+}
+
 BACKUP_EXTENSION(){
-if [[ -d /System/Library/Extensions/"${new_kext}" ]]; then
+if [[ -d ${TARGET}/"${new_kext}" ]]; then
 if [[ ! -d ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}" ]]; then mkdir -p ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}"; fi
     if [[ ! -d ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}"/"${new_kext}" ]]; then 
-        rsync -avq /System/Library/Extensions/"${new_kext}" ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}"; fi 2>&-
+        rsync -avq ${TARGET}/"${new_kext}" ~/Desktop/"Replaced Extensions"/"System Library Extensions"/"${TIME_STAMP}"; fi 2>&-
 fi
 }
 
@@ -315,17 +425,34 @@ if [[ $sver = "" ]]; then
 sver="$(plutil -p "${new_path}"/Info.plist | grep CFBundleShortVersionString | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
 fi
 old_ver=""
-old_ver="$(plutil -p /System/Library/Extensions/"${new_kext}"/Contents/Info.plist | grep CFBundleShortVersionString  | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
+old_ver="$(plutil -p ${TARGET}/"${new_kext}"/Contents/Info.plist | grep CFBundleShortVersionString  | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
 if [[ $old_ver = "" ]]; then
-old_ver="$(plutil -p /System/Library/Extensions/"${new_kext}"/Info.plist | grep CFBundleShortVersionString  | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
+old_ver="$(plutil -p ${TARGET}/"${new_kext}"/Info.plist | grep CFBundleShortVersionString  | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
 fi
+}
+
+BUILD_KERNEL_COLLECTIONS(){
+sudo chroot / sudo kmutil -v create -n boot \
+    --kernel /System/Library/Kernels/kernel \
+    --variant-suffix release --volume-root / $BUNDLE_PATH \
+    --boot-path /System/Library/KernelCollections/BootKernelExtensions.kc &> ~/Desktop/KernelCacheUpdate.log.txt >/dev/null
+
+sudo chroot / sudo kmutil -v create -n sys \
+    --kernel /System/Library/Kernels/kernel \
+    --variant-suffix release --volume-root / \
+    --system-path /System/Library/KernelCollections/SystemKernelExtensions.kc \
+    --boot-path /System/Library/KernelCollections/BootKernelExtensions.kc &> ~/Desktop/KernelCacheUpdate.log.txt
+sudo /usr/sbin/kcditto >> ~/Desktop/KernelCacheUpdate.log.txt 
+
+BUNDLE_PATH=""
+
 }
 
 UPDATE_KERNEL_CACHE(){
 osascript -e 'tell application "Terminal" to activate'
 SET_INPUT
 if [[ $path_count -gt 5 ]]; then let lines="path_count*2+12"; else lines=22; fi
-if [[ $large_window = 1 ]]; then sz=100; else sz=74; fi 
+if [[ $large_window = 1 ]]; then sz=104; else sz=74; fi 
 clear && printf '\e[8;'$lines';'$sz't' && printf '\e[3J' && printf "\033[H"
 echo ${vbuf}
 echo
@@ -350,7 +477,11 @@ printf "\r\033[33C"
 spin="/|\\-/|\\-"; i=0
 while :; do for i in `seq 0 7`;  do printf '\r\033[34C\e[1;32m'"${spin:$i:1}"; echo -en "\010\033[0m";  sleep 0.05; done; done &
 trap "kill $!" EXIT 
+if [[ "${macos}" = "1016" ]] || [[ "${macos:0:2}" = "11" ]]; then
+BUILD_KERNEL_COLLECTIONS
+else
 sudo kextcache -i / &> ~/Desktop/KernelCacheUpdate.log.txt >/dev/null
+fi
 kill $!
 wait $! 2>/dev/null
 trap " " EXIT
@@ -415,7 +546,6 @@ get_args="$(cat  ~/.spatches.txt | tr '\n' ';' | xargs )"
 all_path=(); var=0; m=1; while [[ $var = 0 ]]; do str="$(echo $get_args | cut -f"${m}" -d ';')"; if [[ ! $str = "" ]]; then all_path+=( "${str}" ); let "m++"; else break; fi; done
 path_count=${#all_path[@]}
 rm -f ~/.spatches.txt
-
 }
 
 TRAIL_FOLDER(){
@@ -423,7 +553,7 @@ all_path_trailed=()
 for ((l=0;l<$path_count;l++)) do 
 new_path="$(echo "${all_path[l]}" | xargs)"; new_kext=$(echo "${new_path}" | sed 's|.*/||')
    if [[ ! -f "${new_path}" ]]; then 
-     if [[ ! "${new_path}" = "/System/Library/Extensions" ]] &&  [[ ! "$( echo "${new_path}" | sed 's/[^/]*$//' )" = "/System/Library/Extensions/" ]];  then
+     if [[ ! "${new_path}" = "${TARGET}" ]] &&  [[ ! "$( echo "${new_path}" | sed 's/[^/]*$//' )" = "${TARGET}/" ]];  then
       if [[ -d "${new_path}" ]]; then 
         if [[ -f "${new_path}"/Contents/Info.plist ]] || [[ -f "${new_path}"/Info.plist && "${new_kext##*.}" = "kext" ]]; then all_path_trailed+=( "$(echo "${all_path[l]}" | xargs)" )
             else
@@ -465,6 +595,7 @@ new_kext=$(echo "${new_path}" | sed 's|.*/||'); p=${#new_kext}; let "corr=(36-p)
 GET_KEXT_INFO
 CHECK_INSTALL_KEXTS
 done
+if [[ -f ${TARGET}/non_replaced_kexts.txt ]] && [[ $(cat ${TARGET}/non_replaced_kexts.txt) = "" ]]; then sudo rm -f non_replaced_kexts.txt; fi
 kill $!
 wait $! 2>/dev/null
 trap " " EXIT
@@ -478,6 +609,93 @@ UPDATE_CACHE
                     for ((i=0;i<$kmcount;i++)) do old_kext="${kmlist[i]}"; file_list+='"'${old_kext}'"' ; if [[ ! $i = $(( $kmcount-1 )) ]]; then file_list+=","; fi ; done
             else kmlist=(); kmcount=0
     fi
+}
+
+ASK_FOLDER_TO_ADD(){
+from_list=0
+ if [[ $loc = "ru" ]]; then prompt='"ВЫБЕРИТЕ РАСШИРЕНИЯ ЯДРА ДЛЯ УСТАНОВКИ:"'; else prompt='"SELECT KERNEL EXTENSIONS TO INSTALL:"'; fi
+
+alias_string='"'"$(echo "$(diskutil info $(df / | tail -1 | cut -d' ' -f 1 ) |  grep "Volume Name:" | cut -d':'  -f 2 | xargs)")"':Users:'"$(whoami)"':Desktop"'
+if answer=$(osascript -e 'tell application "Terminal" to (choose file default location alias '"${alias_string}"' with prompt '"${prompt}"' with multiple selections allowed)'); then cancel=0; else cancel=1; fi 2>/dev/null 
+if [[ $answer = "" ]]; then cancel=1
+    else 
+        cancel=0; IFS=","; array=( $answer ); unset IFS
+        temp_array=()
+        for i in ${!array[@]}; do new_path="$( echo "${array[i]}" | tr ':' '/' | rev | sed 's/[^/]*$//' | rev | sed 's/.$//' )"
+        if [[ -f "${new_path}"/Contents/Info.plist ]] || [[ -f "${new_path}"/Info.plist && "${new_kext##*.}" = "kext" ]]; then temp_array+=( "${array[i]}" ); fi
+        done
+        array=( "${temp_array[@]}" ); size=${#array[@]}
+        if [[ ! $size = 0 ]]; then 
+            rm -f ~/.spatches.txt; for i in "${array[@]}"; do echo "$i" | tr ':' '/' | rev | sed 's/[^/]*$//' | rev | sed 's/.$//' >> ~/.spatches.txt; done
+            unset result; for ((i=0;i<$size;i++)) do result+='"'"$(echo ${array[i]} | rev | cut -f2 -d ':' | rev)"; if [[ ! $i = $(( $size-1 )) ]]; then result+='",' ; else result+='"';  fi ;  done
+        else
+            ERROR_NO_VALID_FILES
+        fi
+fi
+}
+
+
+ASK_CONFIRM_KEXTS(){
+if [[ $loc = "ru" ]]; then
+osascript <<EOD
+tell application "System Events"    activate
+set ThemeList to {$result}
+set FavoriteThemeAnswer to choose from list ThemeList with title "$confirm_mesg"  with prompt "Можете выбрать один или несколько файлов и продолжить, или отменить установку:"  with multiple selections allowed 
+end tell
+EOD
+else
+osascript <<EOD
+tell application "System Events"    activate
+set ThemeList to {$result}
+set FavoriteThemeAnswer to choose from list ThemeList with title "$confirm_mesg" with prompt "You can select one or more files and continue, or abort installing:"  with multiple selections allowed
+end tell
+EOD
+fi
+}
+
+ASK_CONFIRM_INSTALL(){
+    if [[ $loc = "ru" ]]; then
+        confirm_mesg="Подтвердите установку расширений:"
+    else
+        confirm_mesg="Confirm installing this kext extensions:"
+    fi
+    return_answer=$( ASK_CONFIRM_KEXTS )
+}
+
+#ASK_CONFIRM_DELETE(){
+#    if [[ $loc = "ru" ]]; then
+#        confirm_mesg="Подтвердите удаление расширений:"
+#    else
+#        confirm_mesg="Confirm removing this kext extensions:"
+#    fi
+#    return_answer=$( ASK_CONFIRM_KEXTS )
+#}
+
+TRAIL_ARGS(){
+confirmed_array=(); IFS=','; confirmed_array=( $return_answer );  unset IFS
+for i in "${confirmed_array[@]}"; do cat ~/.spatches.txt | grep "$(echo "$i" | xargs)" >> ~/.spatches2.txt; done
+mv -f ~/.spatches2.txt ~/.spatches.txt
+}
+
+TRAIL_PATHS(){
+confirmed_array=(); IFS=','; confirmed_array=( $return_answer );  unset IFS
+temp_array=()
+                for i in "${all_path[@]}"; do match=0
+                    for n in "${confirmed_array[@]}"; do 
+                        if [[ ! $(echo "$i" | xargs | grep -o "$(echo "$n" | xargs)" ) = "" ]]; then match=1; break; fi
+                    done
+                    if [[ $match = 1 ]]; then temp_array+=( "$(echo "$i" | xargs)" ); fi
+                done
+all_path=( "${temp_array[@]}" ); path_count=${#all_path[@]}
+}
+
+ASK_KEXTS_TO_ADD(){
+while true; do
+    ASK_FOLDER_TO_ADD
+    if [[ $cancel = 1 ]]; then rm -f ~/.spatches.txt; break; fi
+    ASK_CONFIRM_INSTALL
+    if [[ "$return_answer" = "false" ]]; then rm -f ~/.spatches.txt; break; else TRAIL_ARGS; break; fi
+done
 }
 
 ASK_FOLDER_TO_DELETE(){
@@ -513,10 +731,24 @@ ASK_TO_DELETE_FROM(){
             
 }
 
+ASK_ORIGINAL(){
+                           if [[ $loc = "ru" ]]; then
+             if answer=$(osascript -e 'display dialog "Следует ли после удаления восстановить сохранённые ранее оригинальные системные кексты?" '"${icon_string}"' buttons {"Да", "Нет" } default button "Нет" '); then cancel=0; else cancel=1; fi 2>/dev/null
+             if [[ "$(echo $answer | cut -f2 -d':')" = "Да" ]]; then restore_original=1; fi
+                                else
+             if answer=$(osascript -e 'display dialog "Is it necessary to restore the previously saved original system kexts after deletion?" '"${icon_string}"' buttons {"Yes", "No" } default button "No" '); then cancel=0; else cancel=1; fi 2>/dev/null
+             if [[ "$(echo $answer | cut -f2 -d':')" = "Yes" ]]; then restore_original=1; fi
+                                fi
+ 
+
+}
+
 
 DELETE_KEXTS(){
            if ! GET_PASSWORD; then EXIT_PROGRAM; fi
-           echo $mypassword | sudo -S printf '' >/dev/null 2>/dev/null
+           echo "$PASSWORD" | sudo -S printf '' >/dev/null 2>/dev/null
+           restore_original=0
+           for i in "${kmlist[@]}"; do if [[ -d ${TARGET}/"$i.original" ]]; then ASK_ORIGINAL; break; fi; done
            IFS=","; tmlist=( ${result} ); unset IFS; tmcount=${#tmlist[@]}
            osascript -e 'tell application "Terminal" to activate'
            CREATE_TIMESTAMP
@@ -549,51 +781,25 @@ DELETE_KEXTS(){
 
 SET_INPUT(){
 
-layout_name=`defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleSelectedInputSources | egrep -w 'KeyboardLayout Name' | sed -E 's/.+ = "?([^"]+)"?;/\1/' | tr -d "\n"`
-xkbs=1
+if [[ -f ~/Library/Preferences/com.apple.HIToolbox.plist ]]; then
+    declare -a layouts_names
+    layouts=$(defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleInputSourceHistory | egrep -w 'KeyboardLayout Name' | sed -E 's/.+ = "?([^"]+)"?;/\1/' | tr  '\n' ';')
+    IFS=";"; layouts_names=($layouts); unset IFS; num=${#layouts_names[@]}
 
-case ${layout_name} in
- "Russian"          ) xkbs=2 ;;
- "RussianWin"       ) xkbs=2 ;;
- "Russian-Phonetic" ) xkbs=2 ;;
- "Ukrainian"        ) xkbs=2 ;;
- "Ukrainian-PC"     ) xkbs=2 ;;
- "Byelorussian"     ) xkbs=2 ;;
- esac
+    for i in ${!layouts_names[@]}; do
+        case ${layouts_names[i]} in
+    "ABC"                ) keyboard=${layouts_names[i]}; break ;;
+    "US Extended"        ) keyboard="USExtended"; break ;;
+    "USInternational-PC" ) keyboard=${layouts_names[i]}; break ;;
+    "U.S."               ) keyboard="US"; break ;;
+    "British"            ) keyboard=${layouts_names[i]}; break ;;
+    "British-PC"         ) keyboard=${layouts_names[i]}; break ;;
+                        *) keyboard="0";;
+    esac 
+    done
 
-if [[ $xkbs = 2 ]]; then 
-cd "$(dirname "$0")"
-    if [[ -f "./xkbswitch" ]]; then 
-declare -a layouts_names
-layouts=`defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleInputSourceHistory | egrep -w 'KeyboardLayout Name' | sed -E 's/.+ = "?([^"]+)"?;/\1/' | tr  '\n' ';'`
-IFS=";"; layouts_names=($layouts); unset IFS; num=${#layouts_names[@]}
-keyboard="0"
-
-while [ $num != 0 ]; do 
-case ${layouts_names[$num]} in
- "ABC"                ) keyboard=${layouts_names[$num]} ;;
- "US Extended"        ) keyboard="USExtended" ;;
- "USInternational-PC" ) keyboard=${layouts_names[$num]} ;;
- "U.S."               ) keyboard="US" ;;
- "British"            ) keyboard=${layouts_names[$num]} ;;
- "British-PC"         ) keyboard=${layouts_names[$num]} ;;
-esac
-
-        if [[ ! $keyboard = "0" ]]; then num=1; fi
-let "num--"
-done
-
-if [[ ! $keyboard = "0" ]]; then ./xkbswitch -se $keyboard; fi
-   else
-        if [[ $loc = "ru" ]]; then
-printf '\n\n                         ! Смените раскладку на латиницу !'
-            else
-printf '\n\n                          ! Change layout to UTF-8 ABC, US or EN !'
-        fi
-read -t 2 -n 2 -s
-printf '\r                                                                               \r'
- printf "\r\n\033[3A\033[46C" ; if [[ $order = 3 ]]; then printf "\033[3C"; fi   fi
-
+        if [[ ! $keyboard = "0" ]] && [[ -f "${ROOT}/xkbswitch" ]]; then "${ROOT}"/xkbswitch -se $keyboard; fi
+            
 fi
 
 }
@@ -608,12 +814,13 @@ WINDOW_OFF(){ if [[ $window_minimizable = 1 ]] && [[ $window_visible = 1 ]]; the
 
 clear
 
-cd "$(dirname "$0")"; ROOT="$(dirname "$0")"
+ROOT="$(dirname "$0")"; cd "$ROOT"
 
 osascript -e "tell application \"Terminal\" to set the font size of window 1 to 12"
 osascript -e "tell application \"Terminal\" to set background color of window 1 to {300, 9500, 16250}"
 osascript -e "tell application \"Terminal\" to set normal text color of window 1 to {65535, 65535, 65535}"
 
+TARGET="/System/Library/Extensions"
 
 clear && printf '\e[8;22;74t' && printf '\e[3J' && printf "\033[H"
 loc=`defaults read -g AppleLocale | cut -d "_" -f1`
@@ -623,8 +830,14 @@ wait_on_exit=0; window_visible=1; window_minimizable=1
 printf "\033[?25l"
 macos=$(sw_vers -productVersion | cut -f1-2 -d"." | tr -d '.')
 if [[ "${macos}" = "1015" ]]; then 
-  if ! GET_PASSWORD; then EXIT_PROGRAM; else sudo mount -uw / ; fi
+  if ! GET_PASSWORD; then EXIT_PROGRAM; else echo "$PASSWORD" | sudo -S mount -uw / ; fi
 fi
+if [[ "${macos}" = "1016" ]] || [[ "${macos:0:2}" = "11" ]]; then
+    if [[ $(mount | head -n 1 | egrep -o "disk[0-9]{1,3}s[0-9]{1,3} on /") = "" ]]; then EXIT_SNAPSHOT; fi
+    if ! GET_PASSWORD; then EXIT_PROGRAM; fi
+    if ! echo "$PASSWORD" | sudo -S mount -uw / ; then EXIT_REMOUNT; fi
+fi
+
 printf '\e[3J' && printf "\033[H"
 printf '           \n'
 
@@ -639,26 +852,12 @@ if [[ ! -f ~/Library/Application\ Support/KextSLEinstaller/InstalledKext.plist ]
     echo '</plist>' >> ~/Library/Application\ Support/KextSLEinstaller/InstalledKext.plist
 fi
 
-
-if [[ ! -d  /System/Library/Extensions ]]; then 
-    if ! GET_PASSWORD; then EXIT_PROGRAM; fi
-    echo $mypassword | sudo -S printf '' >/dev/null 2>/dev/null
-    sudo mkdir /System/Library/Extensions
-    sudo chown -R root:wheel /System/Library/Extensions
-    sudo chmod -R 755 /System/Library/Extensions
-fi
-
 UPDATE_CACHE
-
-SET_INPUT
-
-if [[ $log_mode = 1 ]]; then osascript -e 'tell application "Terminal" to set visible of front window to false'; fi
 
 ################ get args string ##########################################################
 
 if [[ ! -f ~/.spatches.txt ]]; then 
  
-
     var1=0; while [[ $var1 = 0 ]]; do
 
     WINDOW_OFF
@@ -676,14 +875,16 @@ if [[ ! -f ~/.spatches.txt ]]; then
         
              answer=$(echo "${answer}"  | cut -f2 -d':' )
             
-if [[ "${answer}" = "Install" ]] || [[ "${answer}" = "Установка" ]]; then
+    if [[ "${answer}" = "Install" ]] || [[ "${answer}" = "Установка" ]]; then
        
 
     sleep 0.3
-    open -W AskKexts.app
+
+    ASK_KEXTS_TO_ADD
 
     clear && printf '\e[3J' && printf "\033[H"
-    if [[ -f ~/.spatches.txt ]]; then  
+
+    if [[ -f ~/.spatches.txt ]]; then 
 
     WINDOW_ON
 
@@ -697,6 +898,7 @@ if [[ "${answer}" = "Install" ]] || [[ "${answer}" = "Установка" ]]; th
                  else 
                     if ! GET_PASSWORD; then EXIT_PROGRAM; fi
                     update_cache=0
+                    if [[ "${macos}" = "1016" ]] || [[ "${macos:0:2}" = "11" ]]; then BUNDLE_PATH=""; fi
                     INSTALL_KEXTS
                     if [[ $update_cache = 0 ]]; then no_kexts=1; else UPDATE_KERNEL_CACHE; fi
                  fi                                  
@@ -711,8 +913,8 @@ if [[ "${answer}" = "Install" ]] || [[ "${answer}" = "Установка" ]]; th
             SLEEP_READ 3
         fi             
     fi
-    
- else
+
+    else
     
     var3=0 
     while [[ $var3 = 0 ]]; do 
@@ -720,7 +922,7 @@ if [[ "${answer}" = "Install" ]] || [[ "${answer}" = "Установка" ]]; th
     GET_INSTALLED_STRING
 
     if [[ ! $strng = "" ]]; then  ASK_TO_DELETE_FROM
-
+        
         if [[ $cancel = 2 ]]; then break; fi
         if [[ $cancel = 0 ]]; then  WINDOW_ON; DELETE_KEXTS ; break; fi
 
@@ -731,7 +933,7 @@ if [[ "${answer}" = "Install" ]] || [[ "${answer}" = "Установка" ]]; th
          if [[ $cancel = 0 ]]; then WINDOW_ON; DELETE_KEXTS; break; fi
     fi
     done
- fi
+    fi
     clear && printf '\e[8;22;74t' && printf '\e[3J' && printf "\033[H"
     done
 fi
@@ -748,11 +950,17 @@ if [[ ${path_count} = 0 ]]; then EXIT_PROGRAM; fi
 
 TRAIL_FOLDER
 
+if [[ ${#all_path[@]} = 0 ]]; then ERROR_NO_VALID_FILES; EXIT_PROGRAM; fi
+unset result; for ((i=0;i<$path_count;i++)) do result+='"'"$(echo ${all_path[i]} | rev | cut -f1 -d '/' | rev)"; if [[ ! $i = $(( $path_count-1 )) ]]; then result+='",' ; else result+='"';  fi ;  done 
+ASK_CONFIRM_INSTALL
+if [[ "$return_answer" = "false" ]]; then EXIT_PROGRAM; else TRAIL_PATHS; fi
 ############################################################################################
 
 if ! GET_PASSWORD; then EXIT_PROGRAM; fi
 
 update_cache=0
+
+if [[ "${macos}" = "1016" ]] || [[ "${macos:0:2}" = "11" ]]; then BUNDLE_PATH=""; fi
 
 INSTALL_KEXTS
 
