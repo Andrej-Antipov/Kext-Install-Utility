@@ -106,7 +106,7 @@ GET_PASSWORD(){
 PASSWORD=""
 if (security find-generic-password -a ${USER} -s addkextinle -w) >/dev/null 2>&1; then
              PASSWORD=$(security find-generic-password -a ${USER} -s addkextinle -w)
-             if ! echo $PASSWORD | sudo -Sk printf '' 2>/dev/null; then 
+             if ! echo "$PASSWORD" | sudo -Sk printf '' 2>/dev/null; then 
                     security delete-generic-password -a ${USER} -s addkextinle >/dev/null 2>&1
                     PASSWORD=""
                         
@@ -130,7 +130,7 @@ if [[ $PASSWORD = "" ]]; then
                         EXIT_PROGRAM
  fi
 
-echo $PASSWORD | sudo -S printf '' 2>/dev/null
+echo "$PASSWORD" | sudo -S printf '' 2>/dev/null
 
 }
 
@@ -146,7 +146,7 @@ ENTER_PASSWORD(){
                 if [[ $cansel = 1 ]]; then break; fi  
                 if [[ $PASSWORD = "" ]]; then PASSWORD="?"; fi
 
-                if echo $PASSWORD | sudo -Sk printf '' 2>/dev/null; then
+                if echo "$PASSWORD" | sudo -Sk printf '' 2>/dev/null; then
                     security add-generic-password -a ${USER} -s addkextinle -w ${PASSWORD} >/dev/null 2>&1
                         
                         if [[ $loc = "ru" ]]; then
@@ -217,10 +217,42 @@ fi
 
 }
 
+ERROR_NO_VALID_FILES(){
+                        if [[ $loc = "ru" ]]; then
+                        SUBTITLE="НЕ ВЫБРАНЫ ВАЛИДНЫЕ ТИПЫ ФАЙЛОВ !"; MESSAGE=""
+                        else
+                        SUBTITLE="NO VALID FILE TYPES WAS CHHOSEN!"; MESSAGE=""
+                        fi
+                        DISPLAY_NOTIFICATION
+}
+
+EXIT_SNAPSHOT(){
+                        if [[ $loc = "ru" ]]; then
+                        SUBTITLE="ОШИБКА! СИСТЕМА ЗАГРУЖЕНА СО СНАПШОТА !"; MESSAGE="КОРНЕВОЙ РАЗДЕЛ НЕЛЬЗЯ ПЕРЕМОНТИРОВАТЬ НА ЗАПИСЬ"
+                        else
+                        SUBTITLE="ERROR! THE SYSTEM LOADED FROM SNAPSHOT !"; MESSAGE="IMPOSSIBLE TO REMOUNT ROOT VOLUME FOR WRITE MODE"
+                        fi
+                        DISPLAY_NOTIFICATION
+                        EXIT_PROGRAM
+}
+
+EXIT_REMOUNT(){
+
+
+                        if [[ $loc = "ru" ]]; then
+                        SUBTITLE="ОШИБКА МОНТИРОВАНИЯ КОРНЕВОГО РАЗДЕЛА НА ЗАПИСЬ!"; MESSAGE=""
+                        else
+                        SUBTITLE="ERROR ! REMOUNTING ROOT VOLUME FOR WRITE FAILED"; MESSAGE=""
+                        fi
+                        DISPLAY_NOTIFICATION
+                        EXIT_PROGRAM
+
+}
+
 DELETE_KEXT(){
 
     let "n++"; let "n++"
-if [[ ! -d /Library/Extensions/"${kext_name}" ]]; then 
+if [[ ! -d ${TARGET}/"${kext_name}" ]]; then 
     if [[ $loc = "ru" ]]; then
     vbuf+=$( printf '\033['${n}';20f''\e[1;31m     Не найден:    \e[1;33m'"${kext_name}"'\e[0m ' )
     else
@@ -230,7 +262,7 @@ if [[ ! -d /Library/Extensions/"${kext_name}" ]]; then
 
 else
     not_found=0
-    if [[ ! /Library/Extensions/"${kext_name}" = "/Library/Extensions/" ]]; then new_kext="${kext_name}"; BACKUP_EXTENSION; sudo rm -Rf /Library/Extensions/"${kext_name}"; update_cache=1; fi
+    if [[ ! ${TARGET}/"${kext_name}" = "${TARGET}/" ]]; then new_kext="${kext_name}"; BACKUP_EXTENSION; echo "$PASSWORD" | sudo -S rm -Rf ${TARGET}/"${kext_name}"; update_cache=1; fi
     if [[ $loc = "ru" ]]; then
     vbuf+=$( printf '\033['${n}';20f''\e[1;31m     Удалён:    \e[1;33m'"${kext_name}"'\e[0m ' )
     else
@@ -243,6 +275,13 @@ fi
 
 }
 
+CHECK_BOOT_CANDIDATE(){
+case "${new_kext}" in
+    LegacyUSBInjector.kext   ) BUNDLE_PATH+=" --bundle-path $TARGET/${new_kext} " ;;
+    USBPorts.kext            ) BUNDLE_PATH+=" --bundle-path $TARGET/${new_kext} " ;;
+esac
+}
+
 CHECK_INSTALL_KEXTS(){
 
 extension="${new_kext##*.}"
@@ -252,21 +291,32 @@ let "n++"; let "n++"
 if [[ ${extension} = "kext" ]] || [[ ${extension} = "bundle" ]] || [[ ${extension} = "plugin" ]] || [[ ${extension} = "ppp" ]]; then 
     update_cache=1
     if [[ $loc = "ru" ]]; then
-    vbuf+=$( printf '\033['${n}';7f''     Установлен:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m' )
+            if [[ $old_ver = "" ]]; then
+                vbuf+=$( printf '\033['${n}';7f''     Установлен:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m' )
+            else
+                vbuf+=$( printf '\033['${n}';7f''\e[1;35m        Заменён:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m' )
+            fi
+            if [[ ! $old_ver = "" ]]; then large_window=1;  vbuf+=$( printf ' -                       была ver. \e[1;31m'$old_ver'\e[0m \n' else printf '\n' ) ; fi        
     else
-    vbuf+=$( printf '\033['${n}';7f''      Installed:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m' )
-    fi
-    if [[ ! $old_ver = "" ]]; then large_window=1;  vbuf+=$( printf ' -      was ver. \e[1;31m'$old_ver'\e[0m \n' else printf '\n' ) ; fi 
+            if [[ $old_ver = "" ]]; then
+                vbuf+=$( printf '\033['${n}';7f''      Installed:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';70f''\e[0m' )
+            else
+                vbuf+=$( printf '\033['${n}';7f''\e[1;35m       Replaced:    \e[1;33m''\033['${n}';'$corr'f'"${new_kext}"'\033['${n}';54f''\e[0m    ver. \e[1;32m'${sver}'\033['${n}';68f''\e[0m' )
+            fi
+            if [[ ! $old_ver = "" ]]; then large_window=1;  vbuf+=$( printf ' -                        was ver. \e[1;31m'$old_ver'\e[0m \n' else printf '\n' ) ; fi
+    fi 
     
-    echo $mypassword | sudo -S printf '' >/dev/null 2>/dev/null
+    echo "$PASSWORD" | sudo -S printf '' >/dev/null 2>/dev/null
 
     BACKUP_EXTENSION
 
-    if [[ -d /Library/Extensions/"${new_kext}" ]] && [[ ! /Library/Extensions/"${new_kext}" = "/Library/Extensions/" ]]; then sudo rm -Rf /Library/Extensions/"${new_kext}"; fi
-    sudo cp -a "${new_path}" /Library/Extensions
-    sudo chown -R root:wheel /Library/Extensions/"${new_kext}"
-    sudo chmod  -R 755 /Library/Extensions/"${new_kext}"
+    if [[ -d ${TARGET}/"${new_kext}" ]] && [[ ! ${TARGET}/"${new_kext}" = "${TARGET}/" ]]; then echo "$PASSWORD" | sudo -S rm -Rf ${TARGET}/"${new_kext}"; fi
+    echo "$PASSWORD" | sudo -S cp -a "${new_path}" ${TARGET}
+    echo "$PASSWORD" | sudo -S chown -R root:wheel ${TARGET}/"${new_kext}"
+    echo "$PASSWORD" | sudo -S chmod  -R 755 ${TARGET}/"${new_kext}"
     ADD_KEXT_IN_PLIST
+
+    if [[ "${macos}" = "1016" ]] || [[ "${macos:0:2}" = "11" ]]; then CHECK_BOOT_CANDIDATE; fi
 
     else
     wait_on_exit=1
@@ -286,10 +336,10 @@ fi
 }
 
 BACKUP_EXTENSION(){
-if [[ -d /Library/Extensions/"${new_kext}" ]]; then
+if [[ -d ${TARGET}/"${new_kext}" ]]; then
 if [[ ! -d ~/Desktop/"Replaced Extensions"/"Library Extensions"/"${TIME_STAMP}" ]]; then mkdir -p ~/Desktop/"Replaced Extensions"/"Library Extensions"/"${TIME_STAMP}"; fi
 if [[ ! -d ~/Desktop/"Replaced Extensions"/"Library Extensions"/"${TIME_STAMP}"/"${new_kext}" ]]; then 
-         rsync -avq /Library/Extensions/"${new_kext}" ~/Desktop/"Replaced Extensions"/"Library Extensions"/"${TIME_STAMP}"; fi ; 2>&-
+         rsync -avq ${TARGET}/"${new_kext}" ~/Desktop/"Replaced Extensions"/"Library Extensions"/"${TIME_STAMP}"; fi ; 2>&-
 fi
 }
 
@@ -314,10 +364,26 @@ if [[ $sver = "" ]]; then
 sver="$(plutil -p "${new_path}"/Info.plist | grep CFBundleShortVersionString | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
 fi
 old_ver=""
-old_ver="$(plutil -p /Library/Extensions/"${new_kext}"/Contents/Info.plist | grep CFBundleShortVersionString  | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
+old_ver="$(plutil -p ${TARGET}/"${new_kext}"/Contents/Info.plist | grep CFBundleShortVersionString  | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
 if [[ $old_ver = "" ]]; then
-old_ver="$(plutil -p /Library/Extensions/"${new_kext}"/Info.plist | grep CFBundleShortVersionString  | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
+old_ver="$(plutil -p ${TARGET}/"${new_kext}"/Info.plist | grep CFBundleShortVersionString  | awk -F"=> " '{print $2}' | cut -c 2- | rev | cut -c 2- | rev )"
 fi
+}
+
+BUILD_KERNEL_COLLECTIONS(){
+#sudo chroot / sudo kmutil -v create -n boot \
+#    --kernel /System/Library/Kernels/kernel \
+#    --variant-suffix release --volume-root / $BUNDLE_PATH \
+#    --boot-path /System/Library/KernelCollections/BootKernelExtensions.kc &> ~/Desktop/KernelCacheUpdate.log.txt >/dev/null
+
+#sudo chroot / sudo kmutil -v create -n aux \
+#    --kernel /System/Library/Kernels/kernel \
+#    --variant-suffix release --volume-root / \
+#    --system-path /System/Library/KernelCollections/SystemKernelExtensions.kc \
+#    --boot-path /System/Library/KernelCollections/BootKernelExtensions.kc &> ~/Desktop/KernelCacheUpdate.log.txt
+sudo chroot / sudo kmutil install --update-all &> ~/Desktop/KernelCacheUpdate.log.txt
+sudo /usr/sbin/kcditto >> ~/Desktop/KernelCacheUpdate.log.txt 
+BUNDLE_PATH=""
 }
 
 UPDATE_KERNEL_CACHE(){
@@ -349,7 +415,11 @@ printf "\r\033[33C"
 spin="/|\\-/|\\-"; i=0
 while :; do for i in `seq 0 7`;  do printf '\r\033[34C\e[1;32m'"${spin:$i:1}"; echo -en "\010\033[0m";  sleep 0.05; done; done &
 trap "kill $!" EXIT 
+if [[ "${macos}" = "1016" ]] || [[ "${macos:0:2}" = "11" ]]; then
+BUILD_KERNEL_COLLECTIONS
+else
 sudo kextcache -i / &> ~/Desktop/KernelCacheUpdate.log.txt >/dev/null
+fi
 kill $!
 wait $! 2>/dev/null
 trap " " EXIT
@@ -422,7 +492,7 @@ all_path_trailed=()
 for ((l=0;l<$path_count;l++)) do 
 new_path="$(echo "${all_path[l]}" | xargs)"; new_kext=$(echo "${new_path}" | sed 's|.*/||')
    if [[ ! -f "${new_path}" ]]; then 
-     if [[ ! "${new_path}" = "/Library/Extensions" ]] &&  [[ ! "$( echo "${new_path}" | sed 's/[^/]*$//' )" = "/Library/Extensions/" ]];  then
+     if [[ ! "${new_path}" = "${TARGET}" ]] &&  [[ ! "$( echo "${new_path}" | sed 's/[^/]*$//' )" = "${TARGET}/" ]];  then
       if [[ -d "${new_path}" ]]; then 
         if [[ -f "${new_path}"/Contents/Info.plist ]] || [[ -f "${new_path}"/Info.plist && "${new_kext##*.}" = "kext" ]]; then all_path_trailed+=( "$(echo "${all_path[l]}" | xargs)" )
             else
@@ -479,6 +549,85 @@ UPDATE_CACHE
     fi
 }
 
+ASK_FOLDER_TO_ADD(){
+from_list=0
+ if [[ $loc = "ru" ]]; then prompt='"ВЫБЕРИТЕ РАСШИРЕНИЯ ЯДРА ДЛЯ УСТАНОВКИ:"'; else prompt='"SELECT KERNEL EXTENSIONS TO INSTALL:"'; fi
+
+alias_string='"'"$(echo "$(diskutil info $(df / | tail -1 | cut -d' ' -f 1 ) |  grep "Volume Name:" | cut -d':'  -f 2 | xargs)")"':Users:'"$(whoami)"':Desktop"'
+if answer=$(osascript -e 'tell application "Terminal" to (choose file default location alias '"${alias_string}"' with prompt '"${prompt}"' with multiple selections allowed)'); then cancel=0; else cancel=1; fi 2>/dev/null 
+if [[ $answer = "" ]]; then cancel=1
+    else 
+        cancel=0; IFS=","; array=( $answer ); unset IFS
+        temp_array=()
+        for i in ${!array[@]}; do new_path="$( echo "${array[i]}" | tr ':' '/' | rev | sed 's/[^/]*$//' | rev | sed 's/.$//' )"
+        if [[ -f "${new_path}"/Contents/Info.plist ]] || [[ -f "${new_path}"/Info.plist && "${new_kext##*.}" = "kext" ]]; then temp_array+=( "${array[i]}" ); fi
+        done
+        array=( "${temp_array[@]}" ); size=${#array[@]}
+        if [[ ! $size = 0 ]]; then 
+            rm -f ~/.patches.txt; for i in "${array[@]}"; do echo "$i" | tr ':' '/' | rev | sed 's/[^/]*$//' | rev | sed 's/.$//' >> ~/.patches.txt; done
+            unset result; for ((i=0;i<$size;i++)) do result+='"'"$(echo ${array[i]} | rev | cut -f2 -d ':' | rev)"; if [[ ! $i = $(( $size-1 )) ]]; then result+='",' ; else result+='"';  fi ;  done
+        else
+            ERROR_NO_VALID_FILES
+        fi
+fi
+}
+
+ASK_CONFIRM_KEXTS(){
+if [[ $loc = "ru" ]]; then
+osascript <<EOD
+tell application "System Events"    activate
+set ThemeList to {$result}
+set FavoriteThemeAnswer to choose from list ThemeList with title "$confirm_mesg"  with prompt "Можете выбрать один или несколько файлов и продолжить, или отменить установку:"  with multiple selections allowed 
+end tell
+EOD
+else
+osascript <<EOD
+tell application "System Events"    activate
+set ThemeList to {$result}
+set FavoriteThemeAnswer to choose from list ThemeList with title "$confirm_mesg" with prompt "You can select one or more files and continue, or abort installing:"  with multiple selections allowed
+end tell
+EOD
+fi
+}
+
+ASK_CONFIRM_INSTALL(){
+    if [[ $loc = "ru" ]]; then
+        confirm_mesg="Подтвердите установку расширений:"
+    else
+        confirm_mesg="Confirm installing this kext extensions:"
+    fi
+    return_answer=$( ASK_CONFIRM_KEXTS )
+}
+
+
+TRAIL_ARGS(){
+confirmed_array=(); IFS=','; confirmed_array=( $return_answer );  unset IFS
+for i in "${confirmed_array[@]}"; do cat ~/.patches.txt | grep "$(echo "$i" | xargs)" >> ~/.patches2.txt; done
+mv -f ~/.patches2.txt ~/.patches.txt
+}
+
+TRAIL_PATHS(){
+confirmed_array=(); IFS=','; confirmed_array=( $return_answer );  unset IFS
+temp_array=()
+                for i in "${all_path[@]}"; do match=0
+                    for n in "${confirmed_array[@]}"; do 
+                        if [[ ! $(echo "$i" | xargs | grep -o "$(echo "$n" | xargs)" ) = "" ]]; then match=1; break; fi
+                    done
+                    if [[ $match = 1 ]]; then temp_array+=( "$(echo "$i" | xargs)" ); fi
+                done
+all_path=( "${temp_array[@]}" ); path_count=${#all_path[@]}
+}
+
+
+ASK_KEXTS_TO_ADD(){
+while true; do
+    ASK_FOLDER_TO_ADD
+    if [[ $cancel = 1 ]]; then rm -f ~/.patches.txt; break; fi
+    ASK_CONFIRM_INSTALL
+    if [[ "$return_answer" = "false" ]]; then rm -f ~/.patches.txt; break; else TRAIL_ARGS; break; fi
+done
+}
+
 ASK_FOLDER_TO_DELETE(){
 from_list=0
  if [[ $loc = "ru" ]]; then prompt='"ВЫБЕРИТЕ ФАЙЛЫ ДЛЯ УДАЛЕНИЯ ИЗ /Library/Extensions:"'; else prompt='"SELECT FILES TO DELETE FROM /Library/Extensions:"'; fi
@@ -515,7 +664,7 @@ ASK_TO_DELETE_FROM(){
 
 DELETE_KEXTS(){
            if ! GET_PASSWORD; then EXIT_PROGRAM; fi
-           echo $mypassword | sudo -S printf '' >/dev/null 2>/dev/null
+           echo "$PASSWORD" | sudo -S printf '' >/dev/null 2>/dev/null
            IFS=","; tmlist=( ${result} ); unset IFS; tmcount=${#tmlist[@]}
            osascript -e 'tell application "Terminal" to activate'
            CREATE_TIMESTAMP
@@ -548,51 +697,25 @@ DELETE_KEXTS(){
 
 SET_INPUT(){
 
-layout_name=`defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleSelectedInputSources | egrep -w 'KeyboardLayout Name' | sed -E 's/.+ = "?([^"]+)"?;/\1/' | tr -d "\n"`
-xkbs=1
+if [[ -f ~/Library/Preferences/com.apple.HIToolbox.plist ]]; then
+    declare -a layouts_names
+    layouts=$(defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleInputSourceHistory | egrep -w 'KeyboardLayout Name' | sed -E 's/.+ = "?([^"]+)"?;/\1/' | tr  '\n' ';')
+    IFS=";"; layouts_names=($layouts); unset IFS; num=${#layouts_names[@]}
 
-case ${layout_name} in
- "Russian"          ) xkbs=2 ;;
- "RussianWin"       ) xkbs=2 ;;
- "Russian-Phonetic" ) xkbs=2 ;;
- "Ukrainian"        ) xkbs=2 ;;
- "Ukrainian-PC"     ) xkbs=2 ;;
- "Byelorussian"     ) xkbs=2 ;;
- esac
+    for i in ${!layouts_names[@]}; do
+        case ${layouts_names[i]} in
+    "ABC"                ) keyboard=${layouts_names[i]}; break ;;
+    "US Extended"        ) keyboard="USExtended"; break ;;
+    "USInternational-PC" ) keyboard=${layouts_names[i]}; break ;;
+    "U.S."               ) keyboard="US"; break ;;
+    "British"            ) keyboard=${layouts_names[i]}; break ;;
+    "British-PC"         ) keyboard=${layouts_names[i]}; break ;;
+                        *) keyboard="0";;
+    esac 
+    done
 
-if [[ $xkbs = 2 ]]; then 
-cd "$(dirname "$0")"
-    if [[ -f "./xkbswitch" ]]; then 
-declare -a layouts_names
-layouts=`defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleInputSourceHistory | egrep -w 'KeyboardLayout Name' | sed -E 's/.+ = "?([^"]+)"?;/\1/' | tr  '\n' ';'`
-IFS=";"; layouts_names=($layouts); unset IFS; num=${#layouts_names[@]}
-keyboard="0"
-
-while [ $num != 0 ]; do 
-case ${layouts_names[$num]} in
- "ABC"                ) keyboard=${layouts_names[$num]} ;;
- "US Extended"        ) keyboard="USExtended" ;;
- "USInternational-PC" ) keyboard=${layouts_names[$num]} ;;
- "U.S."               ) keyboard="US" ;;
- "British"            ) keyboard=${layouts_names[$num]} ;;
- "British-PC"         ) keyboard=${layouts_names[$num]} ;;
-esac
-
-        if [[ ! $keyboard = "0" ]]; then num=1; fi
-let "num--"
-done
-
-if [[ ! $keyboard = "0" ]]; then ./xkbswitch -se $keyboard; fi
-   else
-        if [[ $loc = "ru" ]]; then
-printf '\n\n                         ! Смените раскладку на латиницу !'
-            else
-printf '\n\n                          ! Change layout to UTF-8 ABC, US or EN !'
-        fi
-read -t 2 -n 2 -s
-printf '\r                                                                               \r'
- printf "\r\n\033[3A\033[46C" ; if [[ $order = 3 ]]; then printf "\033[3C"; fi   fi
-
+        if [[ ! $keyboard = "0" ]] && [[ -f "${ROOT}/xkbswitch" ]]; then "${ROOT}"/xkbswitch -se $keyboard; fi
+            
 fi
 
 }
@@ -620,12 +743,22 @@ MyTTY=`tty | tr -d " dev/\n"`
 term=`ps`;  MyTTYcount=`echo $term | grep -Eo $MyTTY | wc -l | tr - " \t\n"`
 wait_on_exit=0; window_visible=1; window_minimizable=1
 printf "\033[?25l"
+
 macos=$(sw_vers -productVersion | cut -f1-2 -d"." | tr -d '.')
 if [[ "${macos}" = "1015" ]]; then 
-  if ! GET_PASSWORD; then EXIT_PROGRAM; else sudo mount -uw / ; fi
+  if ! GET_PASSWORD; then EXIT_PROGRAM; else echo "$PASSWORD" | sudo -S mount -uw / ; fi
 fi
+if [[ "${macos}" = "1016" ]] || [[ "${macos:0:2}" = "11" ]]; then
+    if [[ $(mount | head -n 1 | egrep -o "disk[0-9]{1,3}s[0-9]{1,3} on /") = "" ]]; then EXIT_SNAPSHOT; fi
+    if ! GET_PASSWORD; then EXIT_PROGRAM; fi
+    if ! echo "$PASSWORD" | sudo -S mount -uw / ; then EXIT_REMOUNT; fi
+fi
+
 printf '\e[3J' && printf "\033[H"
 printf '           \n'
+
+TARGET="/Library/Extensions"
+#TARGET="/Users/andrej/Desktop/Extensions"
 
 if [[ ! -d  ~/Library/Application\ Support/KextLEinstaller ]]; then mkdir ~/Library/Application\ Support/KextLEinstaller; fi
 if [[ ! -f ~/Library/Application\ Support/KextLEinstaller/InstalledKext.plist ]]; then
@@ -639,17 +772,16 @@ if [[ ! -f ~/Library/Application\ Support/KextLEinstaller/InstalledKext.plist ]]
 fi
 
 
-if [[ ! -d  /Library/Extensions ]]; then 
+if [[ ! -d  ${TARGET} ]]; then 
     if ! GET_PASSWORD; then EXIT_PROGRAM; fi
-    echo $mypassword | sudo -S printf '' >/dev/null 2>/dev/null
-    sudo mkdir /Library/Extensions
-    sudo chown -R root:wheel /Library/Extensions
-    sudo chmod -R 755 /Library/Extensions
+    echo "$PASSWORD" | sudo -S printf '' >/dev/null 2>/dev/null
+    echo "$PASSWORD" | sudo -S mkdir ${TARGET}
+    echo "$PASSWORD" | sudo -S chown -R root:wheel ${TARGET}
+    echo "$PASSWORD" | sudo -S chmod -R 755 ${TARGET}
 fi
 
-UPDATE_CACHE
 
-SET_INPUT
+UPDATE_CACHE
 
 if [[ $log_mode = 1 ]]; then osascript -e 'tell application "Terminal" to set visible of front window to false'; fi
 
@@ -679,7 +811,7 @@ if [[ "${answer}" = "Install" ]] || [[ "${answer}" = "Установка" ]]; th
        
 
     sleep 0.3
-    open -W AskKexts.app
+    ASK_KEXTS_TO_ADD
 
     clear && printf '\e[3J' && printf "\033[H"
     if [[ -f ~/.patches.txt ]]; then  
@@ -696,6 +828,7 @@ if [[ "${answer}" = "Install" ]] || [[ "${answer}" = "Установка" ]]; th
                  else 
                     if ! GET_PASSWORD; then EXIT_PROGRAM; fi
                     update_cache=0
+                    if [[ "${macos}" = "1016" ]] || [[ "${macos:0:2}" = "11" ]]; then BUNDLE_PATH=""; fi
                     INSTALL_KEXTS
                     if [[ $update_cache = 0 ]]; then no_kexts=1; else UPDATE_KERNEL_CACHE; fi
                  fi                                  
@@ -747,11 +880,18 @@ if [[ ${path_count} = 0 ]]; then EXIT_PROGRAM; fi
 
 TRAIL_FOLDER
 
+if [[ ${#all_path[@]} = 0 ]]; then ERROR_NO_VALID_FILES; EXIT_PROGRAM; fi
+unset result; for ((i=0;i<$path_count;i++)) do result+='"'"$(echo ${all_path[i]} | rev | cut -f1 -d '/' | rev)"; if [[ ! $i = $(( $path_count-1 )) ]]; then result+='",' ; else result+='"';  fi ;  done 
+ASK_CONFIRM_INSTALL
+if [[ "$return_answer" = "false" ]]; then EXIT_PROGRAM; else TRAIL_PATHS; fi
+
 ############################################################################################
 
 if ! GET_PASSWORD; then EXIT_PROGRAM; fi
 
 update_cache=0
+
+if [[ "${macos}" = "1016" ]] || [[ "${macos:0:2}" = "11" ]]; then BUNDLE_PATH=""; fi
 
 INSTALL_KEXTS
 
