@@ -1,5 +1,5 @@
 # Kext-Install-Utility
-Tools to easy install or remove additional kexts into /Library/Extensions & /System/Library/Extensions folders in MacOS 10.11 - 10.15 ( and 11.0)
+Tools to easy install or remove additional kexts into /Library/Extensions (Mac OS 10.11 - 26.0) & /System/Library/Extensions folders in MacOS 10.11 - 10.15 ( and 11.0 eхperimental)
 
 1) Drag and drop to icon applet to install kernel extensions
 2) Store password in keychain
